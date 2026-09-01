@@ -1,7 +1,7 @@
 name: Release
 
-# Builds the Windows installer on a version tag and publishes it straight to
-# the matching GitHub release, together with the latest.yml + .blockmap that
+# Builds the Windows installer on a version tag and publishes it to the
+# matching GitHub release, together with the latest.yml + .blockmap that
 # electron-updater reads. The installer is unsigned — there is no signing step.
 
 on:
@@ -23,13 +23,28 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: npx electron-builder --win --publish always
+      # electron-builder builds the artifacts but does not publish them: left to
+      # publish on its own it raced with itself on v0.1.0 and produced two draft
+      # releases, one holding the installer and one holding the blockmap. The
+      # release is created in one deterministic step below instead.
+      - run: npx electron-builder --win --publish never
+      - if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          gh release create $env:GITHUB_REF_NAME `
+            dist/listan-setup.exe `
+            dist/latest.yml `
+            dist/listan-setup.exe.blockmap `
+            --title "listan $version" `
+            --generate-notes
       - uses: actions/upload-artifact@v7
         with:
           name: listan-windows-setup
           path: |
             dist/listan-setup.exe
+            dist/latest.yml
             dist/*.blockmap
           if-no-files-found: error
