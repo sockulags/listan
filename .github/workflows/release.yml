@@ -1,0 +1,35 @@
+name: Release
+
+# Builds the Windows installer on a version tag and publishes it straight to
+# the matching GitHub release, together with the latest.yml + .blockmap that
+# electron-updater reads. The installer is unsigned — there is no signing step.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx electron-builder --win --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: listan-windows-setup
+          path: |
+            dist/listan-setup.exe
+            dist/*.blockmap
+          if-no-files-found: error

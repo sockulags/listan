@@ -1,0 +1,154 @@
+@import 'tailwindcss';
+
+/* Class-based dark mode (settings-controlled, applied on <html class="dark">). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * listan design system — see docs/design.md.
+ * Shares referat's palette on purpose: warm, calm, Scandinavian, forest-green
+ * accent. Copied rather than imported — two apps that share a palette should
+ * not share a build chain.
+ */
+@theme inline {
+  --font-sans: 'Inter', system-ui, 'Segoe UI', sans-serif;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-fg: var(--accent-soft-fg);
+
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+
+  --color-ring: var(--ring);
+
+  --radius-lg: 12px;
+  --radius-md: 10px;
+  --radius-sm: 8px;
+
+  --shadow-card: 0 1px 2px rgb(20 30 25 / 0.04), 0 1px 3px rgb(20 30 25 / 0.06);
+  --shadow-float: 0 8px 30px rgb(20 30 25 / 0.14), 0 2px 8px rgb(20 30 25 / 0.08);
+}
+
+:root {
+  /* Light — warm off-white */
+  --bg: #faf9f7;
+  --surface: #ffffff;
+  --surface-2: #f4f2ee;
+  --fg: #1c211e;
+  --fg-muted: #56605a;
+  --fg-subtle: #676e68;
+  --border: #e7e3dc;
+  --border-strong: #d6d0c6;
+
+  --accent: #2d6a4f;
+  --accent-hover: #245a43;
+  --accent-fg: #ffffff;
+  --accent-soft: #e6efe9;
+  --accent-soft-fg: #245a43;
+
+  --warning: #8a5a12;
+  --warning-soft: #f8efdd;
+  --danger: #c23b30;
+  --danger-soft: #fbe9e5;
+
+  --ring: #40916c;
+}
+
+.dark {
+  /* Dark — deep warm gray, never coal black */
+  --bg: #1a1917;
+  --surface: #232220;
+  --surface-2: #2c2b28;
+  --fg: #ecebe6;
+  --fg-muted: #a8a59d;
+  --fg-subtle: #9a968e;
+  --border: #34322e;
+  --border-strong: #423f3a;
+
+  --accent: #52b788;
+  --accent-hover: #74c69d;
+  --accent-fg: #10231a;
+  --accent-soft: #22352b;
+  --accent-soft-fg: #95d5b2;
+
+  --warning: #e0b055;
+  --warning-soft: #382f1e;
+  --danger: #e5776b;
+  --danger-soft: #3a2723;
+
+  --ring: #52b788;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow: hidden;
+  }
+
+  ::selection {
+    background-color: var(--accent-soft);
+    color: var(--accent-soft-fg);
+  }
+
+  :focus {
+    outline: none;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Calm, thin scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--border-strong);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.001ms !important;
+  }
+}
