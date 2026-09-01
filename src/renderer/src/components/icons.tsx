@@ -63,6 +63,24 @@ export function PlusIcon(): React.JSX.Element {
   )
 }
 
+export function WindowIcon(): React.JSX.Element {
+  return (
+    <svg {...base} width={16} height={16}>
+      <rect x="3.5" y="5" width="17" height="14" rx="2.5" />
+      <path d="M3.5 9.5h17" />
+    </svg>
+  )
+}
+
+export function GearIcon(): React.JSX.Element {
+  return (
+    <svg {...base} width={16} height={16}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 3.5v2M12 18.5v2M20.5 12h-2M5.5 12h-2M18 6l-1.4 1.4M7.4 16.6L6 18M18 18l-1.4-1.4M7.4 7.4L6 6" />
+    </svg>
+  )
+}
+
 export function ArrowIcon(): React.JSX.Element {
   return (
     <svg {...base} width={14} height={14} strokeWidth={2}>

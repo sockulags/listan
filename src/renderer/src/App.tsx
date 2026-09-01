@@ -4,14 +4,16 @@ import { useQueue } from './useQueue'
 import {
   ChevronIcon,
   CheckIcon,
+  GearIcon,
   OpenIcon,
   PlusIcon,
   PullRequestIcon,
   RunIcon,
-  TickIcon
+  TickIcon,
+  WindowIcon
 } from './components/icons'
 
-/** How long a finished row stays undoable before it is actually deleted. */
+/** How long a finished row stays undoable before the receipt is written. */
 const UNDO_MS = 6000
 
 /** Room for the native window buttons Windows draws over the title bar. */
@@ -31,9 +33,14 @@ function parseInput(value: string): { text: string; link?: string } {
   return { text: rest || match[0], link: match[0] }
 }
 
-/** Meta like `#34` and `1/3` lines up in a column; a word like `release-agent` does not. */
+/** Meta like `#34` and `1/3` lines up in a column; `release-agent` does not. */
 function isNumeric(value: string): boolean {
   return /\d/.test(value) && !/[a-zA-ZåäöÅÄÖ]/.test(value)
+}
+
+/** A brief or a step that wants an answer is more than the queue should show. */
+function isRich(row: Row): boolean {
+  return Boolean(row.body) || row.steps.some((step) => step.expects !== 'none')
 }
 
 export default function App(): React.JSX.Element {
@@ -41,12 +48,14 @@ export default function App(): React.JSX.Element {
   const [selectedTab, setSelectedTab] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [pending, setPending] = useState<Row | null>(null)
+  const [note, setNote] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
   const [updateReady, setUpdateReady] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const noteRef = useRef('')
   const topRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -88,24 +97,49 @@ export default function App(): React.JSX.Element {
   const activeTab = selectedTab ?? snapshot.tabs[0]?.id ?? null
   const sortable = snapshot.tabs.find((tab) => tab.id === activeTab)?.ordered ?? false
 
-  // A finished row disappears at once but is only deleted when the undo window
-  // closes, so a mis-click is recoverable.
-  const finish = useCallback(
+  /**
+   * The row leaves the queue at once but the receipt is only written when the
+   * undo window closes, so a mis-click is recoverable — and whatever you type
+   * in the meantime rides along as the note.
+   */
+  const schedule = useCallback(
     (row: Row) => {
-      setPending(row)
       clearTimeout(timer.current)
       timer.current = setTimeout(async () => {
+        await window.listan.complete(row.id, 'completed', noteRef.current)
         setPending(null)
-        setSnapshot(await window.listan.remove(row.id))
+        setNote('')
+        noteRef.current = ''
+        setSnapshot(await window.listan.read())
       }, UNDO_MS)
     },
     [setSnapshot]
   )
 
+  const finish = useCallback(
+    (row: Row) => {
+      setPending(row)
+      setNote('')
+      noteRef.current = ''
+      schedule(row)
+    },
+    [schedule]
+  )
+
   const undo = useCallback(() => {
     clearTimeout(timer.current)
     setPending(null)
+    setNote('')
+    noteRef.current = ''
   }, [])
+
+  // Typing a note pushes the deadline back; otherwise the row would be filed
+  // half way through a sentence.
+  function editNote(value: string): void {
+    setNote(value)
+    noteRef.current = value
+    if (pending) schedule(pending)
+  }
 
   async function toggleStep(row: Row, stepId: string, done: boolean): Promise<void> {
     const next = await window.listan.setStep(row.id, stepId, done)
@@ -165,6 +199,14 @@ export default function App(): React.JSX.Element {
         >
           <span className="text-[13px] font-medium text-fg-subtle">listan</span>
           <span className="ml-auto whitespace-nowrap text-xs text-fg-subtle">Ctrl+Shift+K</span>
+          <button
+            onClick={() => window.listan.openSettings()}
+            aria-label="Inställningar"
+            style={NO_DRAG}
+            className="shrink-0 text-fg-subtle transition-colors duration-150 hover:text-fg"
+          >
+            <GearIcon />
+          </button>
         </header>
 
         <nav className="flex gap-1.5 px-4 pb-3.5 pt-1">
@@ -175,7 +217,6 @@ export default function App(): React.JSX.Element {
               <button
                 key={tab.id}
                 onClick={() => setSelectedTab(tab.id)}
-                style={NO_DRAG}
                 className={`rounded-full px-3 py-1 text-[13.5px] transition-colors duration-150 ${
                   on ? 'bg-accent-soft font-medium text-accent-soft-fg' : 'text-fg-muted'
                 }`}
@@ -210,8 +251,9 @@ export default function App(): React.JSX.Element {
           )}
 
           {preview.map((row) => {
+            const rich = isRich(row)
             const hasSteps = row.steps.length > 0
-            const open = hasSteps && expanded === row.id
+            const open = hasSteps && !rich && expanded === row.id
             const done = row.steps.filter((step) => step.done).length
 
             const dragProps = sortable
@@ -229,8 +271,13 @@ export default function App(): React.JSX.Element {
               : {}
 
             const dragging = dragId === row.id ? 'opacity-40' : ''
+            const waiting = row.awaited && (
+              <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-soft-fg">
+                väntar
+              </span>
+            )
 
-            if (!hasSteps) {
+            if (!hasSteps && !rich) {
               return (
                 <div
                   key={row.id}
@@ -257,6 +304,7 @@ export default function App(): React.JSX.Element {
                     className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:cursor-default"
                   >
                     <span className="min-w-0 flex-1 truncate">{row.text}</span>
+                    {waiting}
                     {row.source && (
                       <span
                         className={`shrink-0 text-[13px] text-fg-subtle ${
@@ -283,26 +331,35 @@ export default function App(): React.JSX.Element {
                 className={`group mx-2 my-1.5 rounded-[10px] bg-accent-soft transition-opacity duration-150 ${dragging}`}
               >
                 <div className="flex w-full items-center gap-3 px-3 py-3 text-[15px] text-accent-soft-fg">
+                  {/* A rich row opens in its own window; the queue only shows
+                      that it is one and how far it has come. */}
                   <button
-                    onClick={() => setExpanded(open ? null : row.id)}
-                    aria-expanded={open}
-                    aria-label={open ? 'Fäll ihop' : 'Fäll ut'}
+                    onClick={() =>
+                      rich ? window.listan.openRow(row.id) : setExpanded(open ? null : row.id)
+                    }
+                    aria-expanded={rich ? undefined : open}
+                    aria-label={rich ? 'Öppna i eget fönster' : open ? 'Fäll ihop' : 'Fäll ut'}
                     className={`shrink-0 text-accent transition-transform duration-200 ${
-                      open ? '' : '-rotate-90'
+                      rich || open ? '' : '-rotate-90'
                     }`}
                   >
-                    <ChevronIcon />
+                    {rich ? <WindowIcon /> : <ChevronIcon />}
                   </button>
                   <button
-                    onClick={() => row.link && window.listan.open(row.id)}
-                    disabled={!row.link}
+                    onClick={() =>
+                      rich ? window.listan.openRow(row.id) : row.link && window.listan.open(row.id)
+                    }
+                    disabled={!rich && !row.link}
                     className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:cursor-default"
                   >
                     <span className="min-w-0 flex-1 truncate font-medium">{row.text}</span>
-                    <span className="shrink-0 text-[13px] tabular-nums text-accent">
-                      {done}/{row.steps.length}
-                    </span>
-                    {row.link && (
+                    {waiting}
+                    {hasSteps && (
+                      <span className="shrink-0 text-[13px] tabular-nums text-accent">
+                        {done}/{row.steps.length}
+                      </span>
+                    )}
+                    {!rich && row.link && (
                       <span className="shrink-0 text-accent opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100">
                         <OpenIcon />
                       </span>
@@ -347,14 +404,23 @@ export default function App(): React.JSX.Element {
 
       <div ref={bottomRef}>
         {pending && (
-          <div className="flex items-center gap-3 border-t border-border bg-surface px-4 py-3 text-sm">
-            <span className="min-w-0 flex-1 truncate text-fg-muted">{pending.text}</span>
-            <button
-              onClick={undo}
-              className="shrink-0 font-medium text-accent transition-opacity duration-150 hover:opacity-80"
-            >
-              Ångra
-            </button>
+          <div className="flex flex-col gap-2 border-t border-border bg-surface px-4 py-3">
+            <div className="flex items-center gap-3 text-sm">
+              <span className="min-w-0 flex-1 truncate text-fg-muted">{pending.text}</span>
+              <button
+                onClick={undo}
+                className="shrink-0 font-medium text-accent transition-opacity duration-150 hover:opacity-80"
+              >
+                Ångra
+              </button>
+            </div>
+            <input
+              value={note}
+              onChange={(event) => editNote(event.target.value)}
+              placeholder="Notering till agenten, om någon"
+              aria-label="Notering"
+              className="w-full bg-transparent text-[13.5px] outline-none placeholder:text-fg-subtle"
+            />
           </div>
         )}
 

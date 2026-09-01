@@ -26,6 +26,11 @@ bockas försvinner raden, med sex sekunders ångra. I prio-fliken går rader att
 Fältet längst ner lägger till en rad utan att gå via CLI:t. Klistrar du in en länk blir
 den radens länk och resten blir texten.
 
+En rad med en brief eller med steg som vill ha skrivna svar öppnas i eget fönster i
+stället för att fällas ut i kön — kön ska gå att överblicka. Där finns briefen, stegen,
+svarsfälten och en notering, och när du är klar blir fönstret kvittot med två
+kopieringsknappar.
+
 `Ctrl+Shift+K` fäller upp den pinnade overlayn var du än är. Den ligger överst, tar inte
 fokus, och visar en rad i taget: aktiv rad, nästa obockade steg, och en grå rad med vad
 som ligger bakom. Den växer inte när kön växer.
@@ -42,11 +47,30 @@ så en agent som kör om sig själv inte lämnar dubbletter.
 | `listan list [--tab T]`         | hela kön eller en flik                                                           |
 | `listan next`                   | aktiv rad plus nästa obockade steg                                               |
 | `listan check [id]`             | bockar nästa steg, utan id på aktiva raden                                       |
-| `listan rm <id>`                |                                                                                  |
+| `listan rm <id>`                | tar bort raden som avbruten                                                      |
 | `listan requeue <id> [--tab T]` | skickar raden sist i sin flik                                                    |
+| `listan result <id>`            | kvittot, `--format markdown\|json\|prompt\|answers`                              |
+| `listan results [--sedan MS]`   | alla kvitton i fönstret                                                          |
+| `listan wait <id> [--timeout]`  | blockerar tills raden avslutas, skriver då kvittot                               |
 
 `--json` på valfritt kommando ger maskinläsbar utdata. Id:n får förkortas så länge
 prefixet är unikt.
+
+## Återlämning
+
+En rad som lämnar kön lämnar ett kvitto: vad som gjordes, vad du svarade, din notering,
+och **varför** raden försvann — gjord, avbruten, självlöst eller ersatt. Utan den sista
+delen läser en agent "raden är borta" som "arbetet gick bra".
+
+Kvitton lever utanför kön och glöms efter fjorton dagar. Kön har fortfarande ingen
+historik.
+
+Nästa agent hämtar kvittot med `listan result <id> --format prompt`, eller så klistrar du
+in det själv från fönstret. En tråd som fortfarande lever kan i stället blockera på
+`listan wait <id>` och återupptas när du bockar av raden; medan den väntar märks raden i
+kön. Väntan kan stängas av i inställningarna.
+
+Se [docs/agentyta.md](docs/agentyta.md) för formaten och avslutskoderna.
 
 ## Plugin
 
@@ -98,8 +122,9 @@ undantaget tas bort rakt av.
 
 ## Läge
 
-v0.4.0. Kärnan, CLI:t, fönstret, overlayn, autouppdateringen och plugin-utskrivningen
-finns. Se
+v0.5.0. Kärnan, CLI:t, fönstret, detaljfönstret, overlayn, kvittona, autouppdateringen
+och plugin-utskrivningen finns. GitHub-resolvern som stänger rader vars PR redan är
+mergad finns inte än. Se
 [docs/design.md](docs/design.md) för designbriefen.
 
 Appikonen genereras ur paletten i stället för att ligga som binär i repot:

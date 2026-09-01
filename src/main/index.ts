@@ -5,6 +5,7 @@ import { registerQueue } from './queue'
 import { registerOverlay } from './overlay'
 import { registerUpdater } from './updater'
 import { registerTheme, chrome } from './theme'
+import { registerPanes } from './panes'
 import { installPlugin } from './plugin'
 
 const WIDTH = 460
@@ -103,10 +104,14 @@ app.whenReady().then(() => {
   disposeOverlay = registerOverlay()
   disposeUpdater = registerUpdater()
   const disposeHeight = registerAutoHeight()
+  const disposePanes = registerPanes()
   installPlugin()
   createWindow()
 
-  app.on('will-quit', () => disposeHeight())
+  app.on('will-quit', () => {
+    disposeHeight()
+    disposePanes()
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

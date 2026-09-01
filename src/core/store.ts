@@ -1,8 +1,13 @@
 import type { DatabaseSync } from 'node:sqlite'
 import { randomUUID } from 'crypto'
-import type { Row, RowLink, Step, Tab } from '../shared/types'
-import { openDatabase } from './db'
+import type { Expects, Reason, Receipt, Row, RowLink, Step, Tab } from '../shared/types'
+import { openDatabase, RECEIPT_TTL_MS } from './db'
 import { databasePath } from './paths'
+
+export interface StepInput {
+  text: string
+  expects?: Expects
+}
 
 export interface AddInput {
   text: string
@@ -10,7 +15,9 @@ export interface AddInput {
   link?: RowLink
   source?: string
   batch?: string
-  steps?: string[]
+  body?: string
+  context?: string
+  steps?: Array<string | StepInput>
 }
 
 interface TabRecord {
@@ -29,15 +36,20 @@ interface RowRecord {
   link_target: string | null
   source: string | null
   batch: string | null
+  body: string | null
+  context: string | null
 }
 
 interface StepRecord {
   id: string
-  row_id: string
   position: number
   text: string
   done: number
+  expects: string
+  answer: string | null
 }
+
+const ROW_COLUMNS = 'id, tab, position, text, link_kind, link_target, source, batch, body, context'
 
 /** Tab ids are slugs so that `--tab Jobb` and `--tab jobb` mean the same pile. */
 export function slug(name: string): string {
@@ -100,15 +112,14 @@ export class Store {
   rows(tab?: string): Row[] {
     const records = (tab
       ? this.db
-          .prepare(
-            'SELECT id, tab, position, text, link_kind, link_target, source, batch FROM queue_rows WHERE tab = ? ORDER BY position'
-          )
+          .prepare(`SELECT ${ROW_COLUMNS} FROM queue_rows WHERE tab = ? ORDER BY position`)
           .all(tab)
       : // Across tabs, rows follow the tab order shown in the window rather
         // than the alphabetical order of the tab ids.
         this.db
           .prepare(
-            `SELECT r.id, r.tab, r.position, r.text, r.link_kind, r.link_target, r.source, r.batch
+            `SELECT r.id, r.tab, r.position, r.text, r.link_kind, r.link_target, r.source,
+                      r.batch, r.body, r.context
                FROM queue_rows r
                JOIN queue_tabs t ON t.id = r.tab
                ORDER BY t.position, r.position`
@@ -120,9 +131,7 @@ export class Store {
 
   row(id: string): Row | null {
     const record = this.db
-      .prepare(
-        'SELECT id, tab, position, text, link_kind, link_target, source, batch FROM queue_rows WHERE id = ?'
-      )
+      .prepare(`SELECT ${ROW_COLUMNS} FROM queue_rows WHERE id = ?`)
       .get(id) as unknown as RowRecord | undefined
 
     return record ? this.hydrate(record) : null
@@ -145,7 +154,7 @@ export class Store {
    * adding a second one — with several agent threads running, a thread that
    * repeats itself would otherwise leave duplicates behind.
    */
-  add(input: AddInput): Row {
+  add(input: AddInput, now = Date.now()): Row {
     const tab = input.tab ? this.ensureTab(input.tab) : this.orderedTab()
 
     const duplicate = input.link
@@ -155,13 +164,28 @@ export class Store {
       : undefined
 
     if (duplicate) {
-      this.db
-        .prepare('UPDATE queue_rows SET text = ?, source = ?, batch = ? WHERE id = ?')
-        .run(input.text, input.source ?? null, input.batch ?? null, duplicate.id)
+      const replacesSteps = (input.steps?.length ?? 0) > 0
 
-      if (input.steps && input.steps.length > 0) {
+      // Replacing the steps discards work you may already have done, so the
+      // previous state leaves a receipt saying it was superseded.
+      if (replacesSteps) this.writeReceipt(duplicate.id, 'superseded', undefined, now)
+
+      this.db
+        .prepare(
+          'UPDATE queue_rows SET text = ?, source = ?, batch = ?, body = ?, context = ? WHERE id = ?'
+        )
+        .run(
+          input.text,
+          input.source ?? null,
+          input.batch ?? null,
+          input.body ?? null,
+          input.context ?? null,
+          duplicate.id
+        )
+
+      if (replacesSteps) {
         this.db.prepare('DELETE FROM queue_steps WHERE row_id = ?').run(duplicate.id)
-        this.insertSteps(duplicate.id, input.steps)
+        this.insertSteps(duplicate.id, input.steps as Array<string | StepInput>)
       }
 
       return this.row(duplicate.id) as Row
@@ -174,7 +198,8 @@ export class Store {
     const id = randomUUID()
     this.db
       .prepare(
-        'INSERT INTO queue_rows (id, tab, position, text, link_kind, link_target, source, batch, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        `INSERT INTO queue_rows (${ROW_COLUMNS}, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         id,
@@ -185,7 +210,9 @@ export class Store {
         input.link?.target ?? null,
         input.source ?? null,
         input.batch ?? null,
-        Date.now()
+        input.body ?? null,
+        input.context ?? null,
+        now
       )
 
     if (input.steps) this.insertSteps(id, input.steps)
@@ -196,9 +223,7 @@ export class Store {
   /** Active row plus its next unchecked step — all an agent needs to ask for. */
   next(): { row: Row; step: Step | null } | null {
     const record = this.db
-      .prepare(
-        'SELECT id, tab, position, text, link_kind, link_target, source, batch FROM queue_rows WHERE tab = ? ORDER BY position LIMIT 1'
-      )
+      .prepare(`SELECT ${ROW_COLUMNS} FROM queue_rows WHERE tab = ? ORDER BY position LIMIT 1`)
       .get(this.orderedTab()) as unknown as RowRecord | undefined
 
     if (!record) return null
@@ -214,10 +239,18 @@ export class Store {
     return this.row(rowId)
   }
 
+  /** Records what you found. Only steps that asked for an answer have a field. */
+  setAnswer(rowId: string, stepId: string, answer: string): Row | null {
+    this.db
+      .prepare('UPDATE queue_steps SET answer = ? WHERE id = ? AND row_id = ?')
+      .run(answer.trim() === '' ? null : answer, stepId, rowId)
+    return this.row(rowId)
+  }
+
   /**
    * Checks the next unchecked step. Returns the row and whether that was the
-   * last one — the caller decides when to remove it, so the window can offer
-   * an undo before it goes.
+   * last one — the caller decides when to complete it, so the window can offer
+   * an undo before the row goes.
    */
   check(rowId: string): { row: Row; complete: boolean } | null {
     const row = this.row(rowId)
@@ -231,10 +264,97 @@ export class Store {
     return { row: updated, complete }
   }
 
-  remove(id: string): boolean {
+  /**
+   * Takes the row out of the queue and leaves a receipt behind. The reason is
+   * the part that matters: without it a receiver reads "the row is gone" as
+   * "the work passed", which is wrong whenever you cancelled it or a resolver
+   * closed it.
+   */
+  complete(id: string, reason: Reason, note?: string, now = Date.now()): Receipt | null {
+    const receipt = this.writeReceipt(id, reason, note, now)
+    if (!receipt) return null
+
     this.db.prepare('DELETE FROM queue_steps WHERE row_id = ?').run(id)
-    const result = this.db.prepare('DELETE FROM queue_rows WHERE id = ?').run(id)
-    return result.changes > 0
+    this.db.prepare('DELETE FROM queue_rows WHERE id = ?').run(id)
+
+    return receipt
+  }
+
+  /** Removing a row by hand is a cancellation, not a completion. */
+  remove(id: string): boolean {
+    return this.complete(id, 'cancelled') !== null
+  }
+
+  receipt(id: string): Receipt | null {
+    const record = this.db.prepare('SELECT payload FROM receipts WHERE id = ?').get(id) as
+      { payload: string } | undefined
+
+    return record ? (JSON.parse(record.payload) as Receipt) : null
+  }
+
+  /** The most recent receipt for a row, which is what a waiting thread asks for. */
+  receiptForRow(rowId: string): Receipt | null {
+    const record = this.db
+      .prepare('SELECT payload FROM receipts WHERE row_id = ? ORDER BY created_at DESC LIMIT 1')
+      .get(rowId) as { payload: string } | undefined
+
+    return record ? (JSON.parse(record.payload) as Receipt) : null
+  }
+
+  /**
+   * Finds a receipt from an id prefix, matching either the receipt or the row
+   * it came from — by the time you ask, the row id is the one you still have.
+   */
+  resolveReceipt(prefix: string): Receipt | null {
+    const record = this.db
+      .prepare(
+        'SELECT payload FROM receipts WHERE id LIKE ?1 OR row_id LIKE ?1 ORDER BY created_at DESC LIMIT 1'
+      )
+      .get(`${prefix}%`) as { payload: string } | undefined
+
+    return record ? (JSON.parse(record.payload) as Receipt) : null
+  }
+
+  receipts(since = 0): Receipt[] {
+    const records = this.db
+      .prepare('SELECT payload FROM receipts WHERE created_at >= ? ORDER BY created_at')
+      .all(since) as unknown as Array<{ payload: string }>
+
+    return records.map((record) => JSON.parse(record.payload) as Receipt)
+  }
+
+  /**
+   * Registers a thread as blocked on a row. The window shows a marker for it:
+   * when you drain the queue on a Monday, the row somebody is stuck on is the
+   * one worth taking first.
+   */
+  addWaiter(rowId: string, ttlMs: number, now = Date.now()): string {
+    const id = randomUUID()
+    this.db
+      .prepare('INSERT INTO waiters (id, row_id, since, expires_at) VALUES (?, ?, ?, ?)')
+      .run(id, rowId, now, now + ttlMs)
+    return id
+  }
+
+  removeWaiter(id: string): void {
+    this.db.prepare('DELETE FROM waiters WHERE id = ?').run(id)
+  }
+
+  /**
+   * Forgets receipts nobody fetched and waiters whose thread is long gone. Runs
+   * on open; the queue must not accumulate a history behind your back.
+   */
+  prune(now = Date.now(), ttlMs = RECEIPT_TTL_MS): void {
+    this.db.prepare('DELETE FROM receipts WHERE created_at < ?').run(now - ttlMs)
+    this.db.prepare('DELETE FROM waiters WHERE expires_at < ?').run(now)
+  }
+
+  private awaitedRows(now = Date.now()): Set<string> {
+    const records = this.db
+      .prepare('SELECT DISTINCT row_id FROM waiters WHERE expires_at > ?')
+      .all(now) as unknown as Array<{ row_id: string }>
+
+    return new Set(records.map((record) => record.row_id))
   }
 
   /** Sends a row to the back of its tab, or to the back of another tab. */
@@ -272,17 +392,56 @@ export class Store {
     return this.rows(tab)
   }
 
-  private insertSteps(rowId: string, steps: string[]): void {
+  private writeReceipt(
+    rowId: string,
+    reason: Reason,
+    note: string | undefined,
+    now: number
+  ): Receipt | null {
+    const row = this.row(rowId)
+    if (!row) return null
+
+    const receipt: Receipt = {
+      id: randomUUID(),
+      rowId: row.id,
+      reason,
+      createdAt: now,
+      text: row.text,
+      link: row.link,
+      source: row.source,
+      context: row.context,
+      note: note?.trim() || undefined,
+      steps: row.steps.map((step) => ({
+        text: step.text,
+        done: step.done,
+        answer: step.answer
+      }))
+    }
+
+    this.db
+      .prepare(
+        'INSERT INTO receipts (id, row_id, reason, created_at, payload) VALUES (?, ?, ?, ?, ?)'
+      )
+      .run(receipt.id, receipt.rowId, receipt.reason, receipt.createdAt, JSON.stringify(receipt))
+
+    return receipt
+  }
+
+  private insertSteps(rowId: string, steps: Array<string | StepInput>): void {
     const insert = this.db.prepare(
-      'INSERT INTO queue_steps (id, row_id, position, text, done) VALUES (?, ?, ?, ?, 0)'
+      'INSERT INTO queue_steps (id, row_id, position, text, done, expects) VALUES (?, ?, ?, ?, 0, ?)'
     )
-    steps.forEach((text, index) => insert.run(randomUUID(), rowId, index, text))
+
+    steps.forEach((step, index) => {
+      const value = typeof step === 'string' ? { text: step } : step
+      insert.run(randomUUID(), rowId, index, value.text, value.expects ?? 'none')
+    })
   }
 
   private hydrate(record: RowRecord): Row {
     const steps = this.db
       .prepare(
-        'SELECT id, row_id, position, text, done FROM queue_steps WHERE row_id = ? ORDER BY position'
+        'SELECT id, position, text, done, expects, answer FROM queue_steps WHERE row_id = ? ORDER BY position'
       )
       .all(record.id) as unknown as StepRecord[]
 
@@ -297,7 +456,16 @@ export class Store {
           : undefined,
       source: record.source ?? undefined,
       batch: record.batch ?? undefined,
-      steps: steps.map((step) => ({ id: step.id, text: step.text, done: step.done === 1 }))
+      body: record.body ?? undefined,
+      context: record.context ?? undefined,
+      awaited: this.awaitedRows().has(record.id),
+      steps: steps.map((step) => ({
+        id: step.id,
+        text: step.text,
+        done: step.done === 1,
+        expects: (step.expects as Expects) ?? 'none',
+        answer: step.answer ?? undefined
+      }))
     }
   }
 }

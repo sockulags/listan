@@ -2,11 +2,13 @@ export interface Parsed {
   command: string
   positional: string[]
   flags: Record<string, string[]>
+  /** Repeatable flags in the order they were given, so steps keep their order. */
+  ordered: Array<{ name: string; value: string }>
   bare: Set<string>
 }
 
 /** Flags that may be given more than once and keep every value. */
-const REPEATABLE = new Set(['step'])
+const REPEATABLE = new Set(['step', 'fråga', 'fraga'])
 
 /** Flags that take no value. */
 const BARE = new Set(['json', 'help'])
@@ -17,7 +19,13 @@ const BARE = new Set(['json', 'help'])
  * bare `--json`. Anything after `--` is positional.
  */
 export function parse(argv: string[]): Parsed {
-  const parsed: Parsed = { command: '', positional: [], flags: {}, bare: new Set() }
+  const parsed: Parsed = {
+    command: '',
+    positional: [],
+    flags: {},
+    ordered: [],
+    bare: new Set()
+  }
   let literal = false
 
   for (let index = 0; index < argv.length; index++) {
@@ -45,8 +53,12 @@ export function parse(argv: string[]): Parsed {
     const value = inlineValue ?? argv[++index]
     if (value === undefined) continue
 
-    if (REPEATABLE.has(name)) (parsed.flags[name] ??= []).push(value)
-    else parsed.flags[name] = [value]
+    if (REPEATABLE.has(name)) {
+      ;(parsed.flags[name] ??= []).push(value)
+      parsed.ordered.push({ name, value })
+    } else {
+      parsed.flags[name] = [value]
+    }
   }
 
   return parsed
@@ -58,6 +70,20 @@ export function flag(parsed: Parsed, name: string): string | undefined {
 
 export function flags(parsed: Parsed, name: string): string[] {
   return parsed.flags[name] ?? []
+}
+
+/**
+ * Durations as an agent would write them: `30s`, `10m`, or a bare number of
+ * seconds. Anything unparseable falls back to the default rather than throwing.
+ */
+export function duration(value: string | undefined, fallbackMs: number): number {
+  if (!value) return fallbackMs
+
+  const match = value.trim().match(/^(\d+)\s*(s|m)?$/i)
+  if (!match) return fallbackMs
+
+  const amount = Number(match[1])
+  return match[2]?.toLowerCase() === 'm' ? amount * 60_000 : amount * 1000
 }
 
 function splitOnce(token: string): [string, string | undefined] {

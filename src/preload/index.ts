@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import type { Row, Tab } from '../shared/types'
+import type { Reason, Receipt, Row, Settings, Tab } from '../shared/types'
 
 export interface Snapshot {
   tabs: Tab[]
@@ -14,6 +14,22 @@ const api = {
   setStep: (rowId: string, stepId: string, done: boolean): Promise<Snapshot> =>
     ipcRenderer.invoke('queue:setStep', rowId, stepId, done),
   remove: (id: string): Promise<Snapshot> => ipcRenderer.invoke('queue:remove', id),
+  setAnswer: (rowId: string, stepId: string, answer: string): Promise<Snapshot> =>
+    ipcRenderer.invoke('queue:setAnswer', rowId, stepId, answer),
+  row: (id: string): Promise<Row | null> => ipcRenderer.invoke('queue:row', id),
+  complete: (id: string, reason: Reason, note?: string): Promise<Receipt | null> =>
+    ipcRenderer.invoke('queue:complete', id, reason, note),
+  receiptForRow: (rowId: string): Promise<Receipt | null> =>
+    ipcRenderer.invoke('queue:receiptForRow', rowId),
+  renderReceipt: (receipt: Receipt, format: string): Promise<string> =>
+    ipcRenderer.invoke('queue:render', receipt, format),
+  openRow: (id: string): Promise<void> => ipcRenderer.invoke('panes:openRow', id),
+  openSettings: (): Promise<void> => ipcRenderer.invoke('panes:openSettings'),
+  closePane: (): Promise<void> => ipcRenderer.invoke('panes:close'),
+  copy: (text: string): Promise<void> => ipcRenderer.invoke('clipboard:write', text),
+  getSettings: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
+  setSettings: (next: Settings): Promise<Settings> => ipcRenderer.invoke('settings:set', next),
+  paths: (): Promise<{ data: string; plugin: string }> => ipcRenderer.invoke('settings:paths'),
   requeue: (id: string, tab?: string): Promise<Snapshot> =>
     ipcRenderer.invoke('queue:requeue', id, tab),
   reorder: (tab: string, ids: string[]): Promise<Snapshot> =>

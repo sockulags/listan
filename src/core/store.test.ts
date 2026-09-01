@@ -139,6 +139,125 @@ describe('check', () => {
   })
 })
 
+describe('receipts', () => {
+  it('leaves a receipt behind that says why the row went', () => {
+    const s = store()
+    const row = s.add({ text: 'Verifiera auth-flödet', steps: ['ett', 'två'] })
+    s.check(row.id)
+
+    const receipt = s.complete(row.id, 'completed', '  ser bra ut  ')
+    expect(receipt?.reason).toBe('completed')
+    expect(receipt?.note).toBe('ser bra ut')
+    expect(receipt?.steps).toEqual([
+      { text: 'ett', done: true, answer: undefined },
+      { text: 'två', done: false, answer: undefined }
+    ])
+    expect(s.row(row.id)).toBeNull()
+  })
+
+  it('records a removal by hand as a cancellation, not a completion', () => {
+    const s = store()
+    const row = s.add({ text: 'Granska PR 34' })
+
+    s.remove(row.id)
+    expect(s.receiptForRow(row.id)?.reason).toBe('cancelled')
+  })
+
+  it('marks the old state as superseded when an agent replaces the steps', () => {
+    const s = store()
+    const link = { kind: 'url' as const, target: 'https://example.test/pull/34' }
+    const row = s.add({ text: 'Granska PR 34', link, steps: ['läs diffen'] })
+    s.add({ text: 'Granska PR 34', link, steps: ['läs diffen igen', 'merga'] })
+
+    expect(s.receiptForRow(row.id)?.reason).toBe('superseded')
+    expect(s.rows('prio')[0].steps).toHaveLength(2)
+  })
+
+  it('does not supersede a repeat that carries no steps', () => {
+    const s = store()
+    const link = { kind: 'url' as const, target: 'https://example.test/pull/8' }
+    const row = s.add({ text: 'Granska PR 8', link, steps: ['läs diffen'] })
+    s.add({ text: 'Granska PR 8', link })
+
+    expect(s.receiptForRow(row.id)).toBeNull()
+  })
+
+  it('returns nothing for a row that was never there', () => {
+    expect(store().complete('finns-inte', 'completed')).toBeNull()
+  })
+
+  it('forgets receipts older than the retention window', () => {
+    const s = store()
+    const row = s.add({ text: 'Granska PR 34' })
+    s.complete(row.id, 'completed', undefined, 1000)
+
+    s.prune(1000 + 500, 1000)
+    expect(s.receipts()).toHaveLength(1)
+
+    s.prune(1000 + 2000, 1000)
+    expect(s.receipts()).toHaveLength(0)
+  })
+})
+
+describe('answers', () => {
+  it('stores what you found on a step that asked for it', () => {
+    const s = store()
+    const row = s.add({
+      text: 'Verifiera auth-flödet',
+      steps: [{ text: 'kör smoke-testet', expects: 'text' }]
+    })
+
+    expect(row.steps[0].expects).toBe('text')
+    s.setAnswer(row.id, row.steps[0].id, 'in- och utloggning fungerar')
+    expect(s.row(row.id)?.steps[0].answer).toBe('in- och utloggning fungerar')
+  })
+
+  it('clears the answer when it is emptied', () => {
+    const s = store()
+    const row = s.add({ text: 'x', steps: [{ text: 'y', expects: 'text' }] })
+
+    s.setAnswer(row.id, row.steps[0].id, 'något')
+    s.setAnswer(row.id, row.steps[0].id, '   ')
+    expect(s.row(row.id)?.steps[0].answer).toBeUndefined()
+  })
+
+  it('defaults plain steps to asking for nothing', () => {
+    const s = store()
+    expect(s.add({ text: 'x', steps: ['y'] }).steps[0].expects).toBe('none')
+  })
+
+  it('carries answers into the receipt', () => {
+    const s = store()
+    const row = s.add({ text: 'x', steps: [{ text: 'y', expects: 'text' }] })
+    s.setAnswer(row.id, row.steps[0].id, 'svaret')
+
+    expect(s.complete(row.id, 'completed')?.steps[0].answer).toBe('svaret')
+  })
+})
+
+describe('waiters', () => {
+  it('marks a row somebody is blocked on', () => {
+    const s = store()
+    const row = s.add({ text: 'Verifiera auth-flödet' })
+    expect(s.rows('prio')[0].awaited).toBe(false)
+
+    const waiter = s.addWaiter(row.id, 60_000)
+    expect(s.rows('prio')[0].awaited).toBe(true)
+
+    s.removeWaiter(waiter)
+    expect(s.rows('prio')[0].awaited).toBe(false)
+  })
+
+  it('stops counting a waiter whose thread never came back', () => {
+    const s = store()
+    const row = s.add({ text: 'Verifiera auth-flödet' })
+    s.addWaiter(row.id, 60_000, 0)
+
+    s.prune(120_000)
+    expect(s.rows('prio')[0].awaited).toBe(false)
+  })
+})
+
 describe('reorder', () => {
   it('rewrites the order of a tab from a list of ids', () => {
     const s = store()

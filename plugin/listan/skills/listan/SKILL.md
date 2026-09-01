@@ -48,6 +48,43 @@ Flera rader utan egna steg går att skicka radvis på stdin:
 printf 'Boka om onsdagsavstämningen\nSvara Kalle om NIS2\n' | listan add --källa referat
 ```
 
+## Be om ett svar tillbaka
+
+`--step` är ett steg som bara ska bockas av. `--fråga` är ett steg som vill ha något
+skrivet tillbaka — då får Lucas ett textfält att fylla i:
+
+```bash
+listan add "Verifiera auth-flödet" \
+  --link https://github.com/sockulags/smask/pull/57 \
+  --kontext "smask, branch fix/auth, jag väntar på beskedet innan jag mergar" \
+  --step "kör smoke-testet lokalt" \
+  --fråga "vad hände vid utloggning?"
+```
+
+Använd `--fråga` sparsamt. Ett steg som du kan verifiera själv ska inte vara en fråga.
+
+`--kontext` är vad nästa agent behöver veta om du inte finns kvar när svaret kommer:
+repo, branch, vad du höll på med. `--brief` tar markdown som visas när raden öppnas i
+eget fönster — använd det när uppgiften behöver mer förklaring än en rad.
+
+## Hämta resultatet
+
+En rad som avslutas lämnar ett kvitto. Hämta det med `listan result <id>`, och läs
+avslutskoden: `completed` betyder att arbetet gjordes, `cancelled` att raden togs bort
+utan att göras, `auto-resolved` att den löste sig själv, `superseded` att den ersattes.
+**Att raden är borta betyder inte att arbetet gick bra.**
+
+Är du kvar och kan agera direkt på svaret kan du blockera på raden:
+
+```bash
+listan wait <id> --timeout 10m
+```
+
+Kör det i bakgrunden om värden stöder det. Det returnerar när raden avslutas och skriver
+då ut svaren; avslutar med kod 2 om tiden går ut och 3 om väntan är avstängd. Vänta bara
+när svaret kommer inom minuter och du faktiskt kan göra något med det — annars avsluta
+och låt Lucas lämna över kvittot till en ny tråd.
+
 ## Läsa
 
 `listan next` ger aktiv rad plus nästa obockade steg — det är nästan alltid det du vill

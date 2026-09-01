@@ -1,4 +1,5 @@
 import { BrowserWindow, ipcMain, nativeTheme } from 'electron'
+import { readSettings } from '../core/settings'
 
 interface Chrome {
   background: string
@@ -26,6 +27,10 @@ export function chrome(): Chrome {
  */
 export function registerTheme(): () => void {
   ipcMain.handle('theme:get', () => isDark())
+
+  // A forced light or dark setting is applied through nativeTheme, so both the
+  // renderer and the native window buttons follow the same source of truth.
+  nativeTheme.themeSource = readSettings().theme
 
   const apply = (): void => {
     const colours = chrome()

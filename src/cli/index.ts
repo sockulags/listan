@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from 'fs'
 import type { Row, RowLink } from '../shared/types'
-import { flag, flags, parse } from './args'
+import { duration, flag, parse } from './args'
 
 // node:sqlite prints an ExperimentalWarning the moment it is loaded, which
 // would put a stack trace in front of every agent that calls the CLI. The
@@ -14,20 +14,38 @@ process.on('warning', (warning) => {
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { Store, slug } = require('../core/store') as typeof import('../core/store')
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { render } = require('../core/receipt') as typeof import('../core/receipt')
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { readSettings } = require('../core/settings') as typeof import('../core/settings')
 
 const USAGE = `listan — kön för de manuella stegen dina agenter lämnar efter sig
 
   listan add <text> [--tab T] [--link URL] [--fil SÖKVÄG] [--kommando K]
-                    [--step S ...] [--källa K] [--batch B]
+                    [--step S ...] [--fråga F ...] [--brief MD] [--kontext K]
+                    [--källa K] [--batch B]
   listan add                     läser en rad per rad från stdin
   listan list [--tab T]
   listan next                    aktiv rad plus nästa obockade steg
   listan check [id]              bockar nästa steg, utan id på aktiva raden
-  listan rm <id>
+  listan rm <id>                 tar bort raden som avbruten
   listan requeue <id> [--tab T]  skickar raden sist i sin flik
+  listan result <id> [--format markdown|json|prompt|answers]
+  listan results [--sedan MS] [--format ...]
+  listan wait <id> [--timeout 10m]
 
+  --step lägger ett steg, --fråga ett steg som vill ha ett skrivet svar.
+  --brief är markdown som visas när raden öppnas i eget fönster.
+  --kontext är vad nästa agent behöver veta om tråden inte finns kvar.
   --json på valfritt kommando ger maskinläsbar utdata.
-  Id:n får förkortas så länge prefixet är unikt.`
+  Id:n får förkortas så länge prefixet är unikt.
+
+  wait blockerar tills raden avslutas och skriver då ut kvittot. Avslutar med
+  kod 2 om tiden går ut, 3 om väntan är avstängd i inställningarna.`
+
+const WAIT_DEFAULT_MS = 10 * 60_000
+const WAIT_MAX_MS = 60 * 60_000
+const WAIT_POLL_MS = 500
 
 function short(row: Row): string {
   return row.id.slice(0, 8)
@@ -43,6 +61,7 @@ function describe(row: Row): string {
   const counter = progress(row)
   if (counter) parts.push(counter)
   else if (row.source) parts.push(row.source)
+  if (row.awaited) parts.push('(någon väntar)')
   return parts.join('  ')
 }
 
@@ -74,12 +93,37 @@ function linkFrom(parsed: ReturnType<typeof parse>): RowLink | undefined {
   return undefined
 }
 
-function fail(message: string): never {
-  process.stderr.write(`${message}\n`)
-  process.exit(1)
+/** Steps keep the order they were written in, whichever flag introduced them. */
+function stepsFrom(
+  parsed: ReturnType<typeof parse>
+): Array<{ text: string; expects: 'none' | 'text' }> {
+  return parsed.ordered.map((entry) => ({
+    text: entry.value,
+    expects: entry.name === 'step' ? 'none' : 'text'
+  }))
 }
 
-function main(): void {
+function formatOf(
+  parsed: ReturnType<typeof parse>,
+  fallback: 'markdown' | 'answers' = 'markdown'
+): 'markdown' | 'json' | 'prompt' | 'answers' {
+  const value = flag(parsed, 'format')
+  if (value === 'json' || value === 'prompt' || value === 'answers' || value === 'markdown') {
+    return value
+  }
+  return parsed.bare.has('json') ? 'json' : fallback
+}
+
+function fail(message: string, code = 1): never {
+  process.stderr.write(`${message}\n`)
+  process.exit(code)
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function main(): Promise<void> {
   const parsed = parse(process.argv.slice(2))
   const json = parsed.bare.has('json')
 
@@ -104,15 +148,18 @@ function main(): void {
         batch: flag(parsed, 'batch')
       }
 
-      // Steps and a link belong to a single row, so they only apply when one
-      // row is being added. A batch from stdin is a list of bare lines.
+      // Steps, a brief and a link belong to a single row, so they only apply
+      // when one row is being added. A batch from stdin is bare lines.
       const single = texts.length === 1
+      const steps = stepsFrom(parsed)
       const added = texts.map((text) =>
         store.add({
           text,
           ...shared,
           link: single ? linkFrom(parsed) : undefined,
-          steps: single ? flags(parsed, 'step') : undefined
+          body: single ? (flag(parsed, 'brief') ?? flag(parsed, 'body')) : undefined,
+          context: single ? (flag(parsed, 'kontext') ?? flag(parsed, 'context')) : undefined,
+          steps: single && steps.length > 0 ? steps : undefined
         })
       )
 
@@ -170,8 +217,8 @@ function main(): void {
       if (!result) fail('listan check: hittade ingen rad')
 
       if (result.complete) {
-        store.remove(result.row.id)
-        emit({ ...result, removed: true }, `✓ ${result.row.text} — klar och borttagen`)
+        const receipt = store.complete(result.row.id, 'completed')
+        emit(receipt, `✓ ${result.row.text} — klar, kvitto ${receipt?.id.slice(0, 8)}`)
         break
       }
 
@@ -190,8 +237,8 @@ function main(): void {
       const row = store.resolve(target)
       if (!row) fail(`listan rm: hittade ingen rad för "${target}"`)
 
-      store.remove(row.id)
-      emit({ removed: row }, `− ${row.text}`)
+      const receipt = store.complete(row.id, 'cancelled')
+      emit(receipt, `− ${row.text} — avbruten`)
       break
     }
 
@@ -205,6 +252,80 @@ function main(): void {
       const moved = store.requeue(row.id, flag(parsed, 'tab'))
       emit(moved, `↓ ${row.text}`)
       break
+    }
+
+    case 'result': {
+      const target = parsed.positional[0]
+      if (!target) fail('listan result: ange ett id')
+
+      const receipt = store.resolveReceipt(target)
+      if (!receipt) fail(`listan result: inget kvitto för "${target}"`)
+
+      process.stdout.write(`${render(receipt, formatOf(parsed))}\n`)
+      break
+    }
+
+    case 'results': {
+      const since = Number(flag(parsed, 'sedan') ?? flag(parsed, 'since') ?? 0)
+      const receipts = store.receipts(Number.isFinite(since) ? since : 0)
+
+      if (json) {
+        emit(receipts, '')
+        break
+      }
+
+      if (receipts.length === 0) {
+        process.stdout.write('Inga kvitton.\n')
+        break
+      }
+
+      const format = formatOf(parsed)
+      process.stdout.write(
+        `${receipts.map((receipt) => render(receipt, format)).join('\n\n---\n\n')}\n`
+      )
+      break
+    }
+
+    case 'wait': {
+      const target = parsed.positional[0]
+      if (!target) fail('listan wait: ange ett id')
+
+      if (!readSettings().allowWaiting) {
+        fail('listan wait: väntan är avstängd i inställningarna', 3)
+      }
+
+      // A waiting thread already knows what it asked for, so the small format
+      // is the right default here even though `result` defaults to the full one.
+      const existing = store.resolveReceipt(target)
+      if (existing) {
+        process.stdout.write(`${render(existing, formatOf(parsed, 'answers'))}\n`)
+        break
+      }
+
+      const row = store.resolve(target)
+      if (!row) fail(`listan wait: hittade ingen rad för "${target}"`)
+
+      const timeout = Math.min(duration(flag(parsed, 'timeout'), WAIT_DEFAULT_MS), WAIT_MAX_MS)
+      const waiter = store.addWaiter(row.id, timeout)
+      const deadline = Date.now() + timeout
+
+      // Polling a local file every half second costs nothing; it is the agent
+      // re-invoking itself that is expensive, and this exists to avoid that.
+      try {
+        while (Date.now() < deadline) {
+          await sleep(WAIT_POLL_MS)
+
+          const receipt = store.receiptForRow(row.id)
+          if (receipt) {
+            process.stdout.write(`${render(receipt, formatOf(parsed, 'answers'))}\n`)
+            return
+          }
+        }
+      } finally {
+        store.removeWaiter(waiter)
+      }
+
+      return fail(`listan wait: tiden gick ut, raden ${short(row)} är fortfarande öppen`, 2)
     }
 
     default:

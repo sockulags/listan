@@ -41,6 +41,19 @@ under två rader, och det läste som att något saknades.
 Längst ner ligger ett enradsfält att lägga till i. Det förankrar layouten och gör appen
 användbar utan CLI:t. Klistrar du in en länk blir den radens länk och resten blir texten.
 
+## Tre ytor, tre uppgifter
+
+Overlayn är till för att glutta, kön för att tömma, detaljfönstret för att göra. Så länge
+de hålls isär blir ingen av dem rörig.
+
+En rad hamnar i detaljfönstret när den har en brief från agenten eller steg som vill ha
+skrivna svar. Har den bara textsteg är utfällningen i kön fortfarande snabbast — tvinga
+inte fram ett fönster för tre kryssrutor.
+
+Briefen renderas som markdown, aldrig som HTML. Agentskriven HTML i ett fönster med
+preload-åtkomst är ett hål mot IPC, så renderaren bygger React-element och tolkar aldrig
+markup.
+
 ## Komponentspråk
 
 - Rundade hörn (8–12 px), generös whitespace.

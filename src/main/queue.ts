@@ -1,8 +1,9 @@
 import { BrowserWindow, ipcMain, shell } from 'electron'
 import { watch } from 'fs'
 import { exec } from 'child_process'
-import type { Row, Tab } from '../shared/types'
+import type { Reason, Receipt, Row, Tab } from '../shared/types'
 import { Store } from '../core/store'
+import { render, type Format } from '../core/receipt'
 import { dataDir, databasePath } from '../core/paths'
 
 export interface Snapshot {
@@ -30,6 +31,23 @@ export function registerQueue(): () => void {
     store.setStep(rowId, stepId, done)
     return snapshot()
   })
+
+  ipcMain.handle('queue:setAnswer', (_event, rowId: string, stepId: string, answer: string) => {
+    store.setAnswer(rowId, stepId, answer)
+    return snapshot()
+  })
+
+  ipcMain.handle('queue:row', (_event, id: string) => store.row(id))
+
+  ipcMain.handle('queue:complete', (_event, id: string, reason: Reason, note?: string) =>
+    store.complete(id, reason, note)
+  )
+
+  ipcMain.handle('queue:receiptForRow', (_event, rowId: string) => store.receiptForRow(rowId))
+
+  ipcMain.handle('queue:render', (_event, receipt: Receipt, format: Format) =>
+    render(receipt, format)
+  )
 
   ipcMain.handle('queue:remove', (_event, id: string) => {
     store.remove(id)
@@ -74,6 +92,11 @@ export function registerQueue(): () => void {
     watcher.close()
     ipcMain.removeHandler('queue:read')
     ipcMain.removeHandler('queue:add')
+    ipcMain.removeHandler('queue:setAnswer')
+    ipcMain.removeHandler('queue:row')
+    ipcMain.removeHandler('queue:complete')
+    ipcMain.removeHandler('queue:receiptForRow')
+    ipcMain.removeHandler('queue:render')
     ipcMain.removeHandler('queue:setStep')
     ipcMain.removeHandler('queue:remove')
     ipcMain.removeHandler('queue:requeue')

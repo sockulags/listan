@@ -1,5 +1,30 @@
 import { describe, expect, it } from 'vitest'
-import { flag, flags, parse } from './args'
+import { duration, flag, flags, parse } from './args'
+
+describe('ordered', () => {
+  it('keeps steps and questions in the order they were written', () => {
+    const parsed = parse(['add', 'x', '--step', 'ett', '--fråga', 'vad hände', '--step', 'tre'])
+
+    expect(parsed.ordered).toEqual([
+      { name: 'step', value: 'ett' },
+      { name: 'fråga', value: 'vad hände' },
+      { name: 'step', value: 'tre' }
+    ])
+  })
+})
+
+describe('duration', () => {
+  it('reads minutes, seconds and bare numbers', () => {
+    expect(duration('10m', 0)).toBe(600_000)
+    expect(duration('30s', 0)).toBe(30_000)
+    expect(duration('45', 0)).toBe(45_000)
+  })
+
+  it('falls back rather than throwing on nonsense', () => {
+    expect(duration('snart', 1234)).toBe(1234)
+    expect(duration(undefined, 1234)).toBe(1234)
+  })
+})
 
 describe('parse', () => {
   it('reads the command and its text', () => {
