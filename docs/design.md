@@ -46,6 +46,14 @@ klar-vy att gå till.
 
 Alltid överst, pinnbar, en rad i taget: radens titel, nästa obockade steg, och en grå
 rad med vad som ligger bakom. Den växer inte när kön växer — överflödet blir `+2`.
+`Ctrl+Shift+K` fäller upp och ner den. Den tar aldrig fokus, för den ska kunna komma
+fram mitt i något annat utan att avbryta det.
+
+## Ikon
+
+Skogsgrön rundad kvadrat med en gräddvit bock, genererad ur paletten av
+`scripts/make-icon.mjs`. Bocken är det enda som ryms vid 16 px; allt mer detaljerat blir
+grumligt i aktivitetsfältet.
 
 ## Vad som medvetet inte finns
 

@@ -19,7 +19,12 @@ listan add "Verifiera auth-flödet" --link https://github.com/sockulags/smask/pu
 
 Fönstret visar kön. Rader utan steg är platta — klick öppnar länken, och kryssikonen
 till vänster tar bort raden när du är klar. Rader med steg fälls ut. När sista steget
-bockas försvinner raden, med sex sekunders ångra.
+bockas försvinner raden, med sex sekunders ångra. I prio-fliken går rader att dra om;
+övriga flikar är högar utan inbördes ordning och går därför inte att sortera.
+
+`Ctrl+Shift+K` fäller upp den pinnade overlayn var du än är. Den ligger överst, tar inte
+fokus, och visar en rad i taget: aktiv rad, nästa obockade steg, och en grå rad med vad
+som ligger bakom. Den växer inte när kön växer.
 
 Samma länk två gånger uppdaterar den befintliga raden i stället för att lägga en till,
 så en agent som kör om sig själv inte lämnar dubbletter.
@@ -76,9 +81,11 @@ Installeraren är osignerad, så SmartScreen varnar första gången. Winget komm
 
 ## Läge
 
-v0.1.0. Kärnan, CLI:t, fönstret och plugin-utskrivningen finns. Overlayn, global hotkey
-och omordning med musen finns inte än. Se [docs/design.md](docs/design.md) för
-designbriefen.
+v0.2.0. Kärnan, CLI:t, fönstret, overlayn och plugin-utskrivningen finns. Se
+[docs/design.md](docs/design.md) för designbriefen.
+
+Appikonen genereras ur paletten i stället för att ligga som binär i repot:
+`npm run icon` skriver om `build/icon.ico`.
 
 ## Licens
 

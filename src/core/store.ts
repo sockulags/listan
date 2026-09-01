@@ -254,6 +254,24 @@ export class Store {
     return this.row(id)
   }
 
+  /**
+   * Rewrites the order of a tab from a list of ids. The window sends the whole
+   * order after a drag rather than a from/to pair, so a dropped or stale id
+   * cannot leave the queue half-sorted. Ids that are not in the tab are
+   * ignored, and rows the caller left out keep their relative order at the end.
+   */
+  reorder(tab: string, ids: string[]): Row[] {
+    const current = this.rows(tab)
+    const known = new Set(current.map((row) => row.id))
+    const wanted = ids.filter((id) => known.has(id))
+    const rest = current.filter((row) => !wanted.includes(row.id)).map((row) => row.id)
+
+    const update = this.db.prepare('UPDATE queue_rows SET position = ? WHERE id = ?')
+    ;[...wanted, ...rest].forEach((id, index) => update.run(index, id))
+
+    return this.rows(tab)
+  }
+
   private insertSteps(rowId: string, steps: string[]): void {
     const insert = this.db.prepare(
       'INSERT INTO queue_steps (id, row_id, position, text, done) VALUES (?, ?, ?, ?, 0)'

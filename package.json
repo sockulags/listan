@@ -1,6 +1,6 @@
 {
   "name": "listan",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Kön för de manuella stegen dina agenter lämnar efter sig.",
   "main": "./out/main/index.js",
   "bin": {
@@ -21,6 +21,7 @@
     "dev": "electron-vite dev",
     "build": "npm run typecheck && electron-vite build && npm run build:cli",
     "build:cli": "tsc -p tsconfig.cli.json",
+    "icon": "node scripts/make-icon.mjs",
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder --win"
   },

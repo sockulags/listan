@@ -36,6 +36,11 @@ export function registerQueue(): () => void {
     return snapshot()
   })
 
+  ipcMain.handle('queue:reorder', (_event, tab: string, ids: string[]) => {
+    store.reorder(tab, ids)
+    return snapshot()
+  })
+
   ipcMain.handle('queue:open', (_event, id: string) => {
     const row = store.row(id)
     if (!row?.link) return false
@@ -66,6 +71,7 @@ export function registerQueue(): () => void {
     ipcMain.removeHandler('queue:setStep')
     ipcMain.removeHandler('queue:remove')
     ipcMain.removeHandler('queue:requeue')
+    ipcMain.removeHandler('queue:reorder')
     ipcMain.removeHandler('queue:open')
     store.close()
   }

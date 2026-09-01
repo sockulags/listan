@@ -2,9 +2,11 @@ import { app, shell, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerQueue } from './queue'
+import { registerOverlay } from './overlay'
 import { installPlugin } from './plugin'
 
 let disposeQueue: (() => void) | undefined
+let disposeOverlay: (() => void) | undefined
 
 function createWindow(): void {
   const window = new BrowserWindow({
@@ -22,6 +24,12 @@ function createWindow(): void {
   })
 
   window.on('ready-to-show', () => window.show())
+
+  // The hidden overlay still counts as an open window, so closing the queue has
+  // to end the app on its own rather than wait for window-all-closed.
+  window.on('closed', () => {
+    if (process.platform !== 'darwin') app.quit()
+  })
 
   window.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
@@ -43,6 +51,7 @@ app.whenReady().then(() => {
   })
 
   disposeQueue = registerQueue()
+  disposeOverlay = registerOverlay()
   installPlugin()
   createWindow()
 
@@ -52,10 +61,14 @@ app.whenReady().then(() => {
 })
 
 app.on('will-quit', () => {
+  disposeOverlay?.()
+  disposeOverlay = undefined
   disposeQueue?.()
   disposeQueue = undefined
 })
 
+// The overlay is not a window you close your way out of the app with, so only
+// the main window closing counts.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })

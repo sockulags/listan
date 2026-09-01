@@ -14,6 +14,9 @@ const api = {
   remove: (id: string): Promise<Snapshot> => ipcRenderer.invoke('queue:remove', id),
   requeue: (id: string, tab?: string): Promise<Snapshot> =>
     ipcRenderer.invoke('queue:requeue', id, tab),
+  reorder: (tab: string, ids: string[]): Promise<Snapshot> =>
+    ipcRenderer.invoke('queue:reorder', tab, ids),
+  hideOverlay: (): Promise<void> => ipcRenderer.invoke('overlay:hide'),
   open: (id: string): Promise<boolean> => ipcRenderer.invoke('queue:open', id),
   onChanged: (listener: () => void): (() => void) => {
     const handler = (): void => listener()

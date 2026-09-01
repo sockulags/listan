@@ -139,6 +139,37 @@ describe('check', () => {
   })
 })
 
+describe('reorder', () => {
+  it('rewrites the order of a tab from a list of ids', () => {
+    const s = store()
+    const a = s.add({ text: 'a' })
+    const b = s.add({ text: 'b' })
+    const c = s.add({ text: 'c' })
+
+    s.reorder('prio', [c.id, a.id, b.id])
+    expect(s.rows('prio').map((row) => row.text)).toEqual(['c', 'a', 'b'])
+  })
+
+  it('keeps rows the caller left out, after the ones it named', () => {
+    const s = store()
+    const a = s.add({ text: 'a' })
+    s.add({ text: 'b' })
+    const c = s.add({ text: 'c' })
+
+    s.reorder('prio', [c.id, a.id])
+    expect(s.rows('prio').map((row) => row.text)).toEqual(['c', 'a', 'b'])
+  })
+
+  it('ignores ids that are not in the tab', () => {
+    const s = store()
+    const a = s.add({ text: 'a' })
+    const b = s.add({ text: 'b' })
+
+    s.reorder('prio', [b.id, 'finns-inte', a.id])
+    expect(s.rows('prio').map((row) => row.text)).toEqual(['b', 'a'])
+  })
+})
+
 describe('resolve', () => {
   it('finds a row by an id prefix', () => {
     const s = store()

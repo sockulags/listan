@@ -47,6 +47,30 @@ export function CheckIcon(): React.JSX.Element {
   )
 }
 
+export function ArrowIcon(): React.JSX.Element {
+  return (
+    <svg {...base} width={14} height={14} strokeWidth={2}>
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
+  )
+}
+
+export function CloseIcon(): React.JSX.Element {
+  return (
+    <svg {...base} width={15} height={15} strokeWidth={2}>
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  )
+}
+
+export function GripIcon(): React.JSX.Element {
+  return (
+    <svg {...base} width={16} height={16} strokeWidth={2}>
+      <path d="M9 7h.01M15 7h.01M9 12h.01M15 12h.01M9 17h.01M15 17h.01" />
+    </svg>
+  )
+}
+
 export function ChevronIcon(): React.JSX.Element {
   return (
     <svg {...base} strokeWidth={2}>
