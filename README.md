@@ -79,9 +79,23 @@ npm version patch && git push --follow-tags
 
 Installeraren är osignerad, så SmartScreen varnar första gången. Winget kommer senare.
 
+## Autouppdatering
+
+Appen kontrollerar GitHub-releaserna 20 sekunder efter start och sedan var fjärde timme.
+Hittas en nyare version hämtas den i bakgrunden och installeras nästa gång du avslutar
+appen; en rad längst ner erbjuder omstart direkt om du hellre vill det. Installationen
+sker per användare och kräver ingen behörighetsdialog.
+
+Eftersom installeraren är osignerad finns ingen Authenticode-identitet att verifiera mot,
+så den kontrollen är avstängd i `src/main/updater.ts`. Nedladdningen skyddas i stället av
+att `latest.yml` hämtas över HTTPS och att installerarens sha512 kontrolleras därifrån
+innan något körs. När installerarna en dag signeras av ett CA-betrott certifikat kan
+undantaget tas bort rakt av.
+
 ## Läge
 
-v0.2.0. Kärnan, CLI:t, fönstret, overlayn och plugin-utskrivningen finns. Se
+v0.3.0. Kärnan, CLI:t, fönstret, overlayn, autouppdateringen och plugin-utskrivningen
+finns. Se
 [docs/design.md](docs/design.md) för designbriefen.
 
 Appikonen genereras ur paletten i stället för att ligga som binär i repot:

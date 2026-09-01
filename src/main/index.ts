@@ -3,10 +3,12 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerQueue } from './queue'
 import { registerOverlay } from './overlay'
+import { registerUpdater } from './updater'
 import { installPlugin } from './plugin'
 
 let disposeQueue: (() => void) | undefined
 let disposeOverlay: (() => void) | undefined
+let disposeUpdater: (() => void) | undefined
 
 function createWindow(): void {
   const window = new BrowserWindow({
@@ -52,6 +54,7 @@ app.whenReady().then(() => {
 
   disposeQueue = registerQueue()
   disposeOverlay = registerOverlay()
+  disposeUpdater = registerUpdater()
   installPlugin()
   createWindow()
 
@@ -61,6 +64,8 @@ app.whenReady().then(() => {
 })
 
 app.on('will-quit', () => {
+  disposeUpdater?.()
+  disposeUpdater = undefined
   disposeOverlay?.()
   disposeOverlay = undefined
   disposeQueue?.()

@@ -17,6 +17,12 @@ const api = {
   reorder: (tab: string, ids: string[]): Promise<Snapshot> =>
     ipcRenderer.invoke('queue:reorder', tab, ids),
   hideOverlay: (): Promise<void> => ipcRenderer.invoke('overlay:hide'),
+  installUpdate: (): Promise<void> => ipcRenderer.invoke('update:install'),
+  onUpdateReady: (listener: (version: string) => void): (() => void) => {
+    const handler = (_event: unknown, version: string): void => listener(version)
+    ipcRenderer.on('update:ready', handler)
+    return () => ipcRenderer.off('update:ready', handler)
+  },
   open: (id: string): Promise<boolean> => ipcRenderer.invoke('queue:open', id),
   onChanged: (listener: () => void): (() => void) => {
     const handler = (): void => listener()

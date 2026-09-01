@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Row } from '@shared/types'
 import { useQueue } from './useQueue'
 import { ChevronIcon, CheckIcon, OpenIcon, PullRequestIcon, RunIcon } from './components/icons'
@@ -13,7 +13,12 @@ export default function App(): React.JSX.Element {
   const [pending, setPending] = useState<Row | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
+  const [updateReady, setUpdateReady] = useState<string | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  // A staged update installs on its own the next time the app quits; the line
+  // at the bottom is only there for when you would rather have it now.
+  useEffect(() => window.listan.onUpdateReady(setUpdateReady), [])
 
   // Until a tab is picked, the first one is shown. Deriving it rather than
   // storing it keeps the two in sync when tabs appear from the CLI.
@@ -252,6 +257,18 @@ export default function App(): React.JSX.Element {
             className="shrink-0 font-medium text-accent transition-opacity duration-150 hover:opacity-80"
           >
             Ångra
+          </button>
+        </div>
+      )}
+
+      {updateReady && (
+        <div className="flex items-center gap-3 border-t border-border bg-surface px-4 py-3 text-sm">
+          <span className="min-w-0 flex-1 truncate text-fg-muted">{updateReady} är hämtad</span>
+          <button
+            onClick={() => window.listan.installUpdate()}
+            className="shrink-0 font-medium text-accent transition-opacity duration-150 hover:opacity-80"
+          >
+            Starta om
           </button>
         </div>
       )}
