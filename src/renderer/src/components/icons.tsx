@@ -38,6 +38,15 @@ export function OpenIcon(): React.JSX.Element {
   )
 }
 
+export function CheckIcon(): React.JSX.Element {
+  return (
+    <svg {...base} width={17} height={17}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M8.5 12.2l2.4 2.4 4.6-4.8" />
+    </svg>
+  )
+}
+
 export function ChevronIcon(): React.JSX.Element {
   return (
     <svg {...base} strokeWidth={2}>

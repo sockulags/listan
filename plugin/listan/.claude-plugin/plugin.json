@@ -1,0 +1,8 @@
+{
+  "name": "listan",
+  "description": "Lägg manuella steg i listan så att de finns kvar när sessionen tar slut.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Lucas Skog"
+  }
+}

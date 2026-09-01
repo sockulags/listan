@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Kön för de manuella stegen dina agenter lämnar efter sig.",
   "main": "./out/main/index.js",
+  "bin": {
+    "listan": "./out/cli/index.js"
+  },
   "author": "Lucas Skog <lucasskog@gmail.com>",
   "license": "MIT",
   "scripts": {
@@ -13,9 +16,11 @@
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "test": "npm run test:unit",
     "test:unit": "vitest run --passWithNoTests",
+    "postinstall": "install-electron",
     "start": "electron-vite preview",
     "dev": "electron-vite dev",
-    "build": "npm run typecheck && electron-vite build",
+    "build": "npm run typecheck && electron-vite build && npm run build:cli",
+    "build:cli": "tsc -p tsconfig.cli.json",
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder --win"
   },

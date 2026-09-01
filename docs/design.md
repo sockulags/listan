@@ -5,7 +5,7 @@
 Lugn, varm, skandinavisk — samma språk som referat. Appen är en avlämningsplats,
 inte ett projektverktyg: den ska kännas som en prydlig anteckningsbok du tömmer,
 aldrig som en ärendekö som kräver något av dig. Ledord: **ren, varm, tyst självsäker**.
-Inga onödiga ramar och skuggor — en ram *eller* en skugga, aldrig båda.
+Inga onödiga ramar och skuggor — en ram _eller_ en skugga, aldrig båda.
 
 ## Vad listan är
 

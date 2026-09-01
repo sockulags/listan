@@ -1,14 +1,33 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+import type { Row, Tab } from '../shared/types'
 
-// The renderer never talks to Node directly. Queue operations land here as the
-// store lands in the main process.
-const api = {}
+export interface Snapshot {
+  tabs: Tab[]
+  rows: Row[]
+}
+
+const api = {
+  read: (): Promise<Snapshot> => ipcRenderer.invoke('queue:read'),
+  setStep: (rowId: string, stepId: string, done: boolean): Promise<Snapshot> =>
+    ipcRenderer.invoke('queue:setStep', rowId, stepId, done),
+  remove: (id: string): Promise<Snapshot> => ipcRenderer.invoke('queue:remove', id),
+  requeue: (id: string, tab?: string): Promise<Snapshot> =>
+    ipcRenderer.invoke('queue:requeue', id, tab),
+  open: (id: string): Promise<boolean> => ipcRenderer.invoke('queue:open', id),
+  onChanged: (listener: () => void): (() => void) => {
+    const handler = (): void => listener()
+    ipcRenderer.on('queue:changed', handler)
+    return () => ipcRenderer.off('queue:changed', handler)
+  }
+}
+
+export type QueueApi = typeof api
 
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI)
-    contextBridge.exposeInMainWorld('api', api)
+    contextBridge.exposeInMainWorld('listan', api)
   } catch (error) {
     console.error(error)
   }
@@ -16,5 +35,5 @@ if (process.contextIsolated) {
   // @ts-ignore (define in dts)
   window.electron = electronAPI
   // @ts-ignore (define in dts)
-  window.api = api
+  window.listan = api
 }

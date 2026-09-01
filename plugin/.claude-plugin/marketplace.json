@@ -1,0 +1,13 @@
+{
+  "name": "listan",
+  "owner": {
+    "name": "Lucas Skog"
+  },
+  "plugins": [
+    {
+      "name": "listan",
+      "source": "./listan",
+      "description": "Lägg manuella steg i listan så att de finns kvar när sessionen tar slut."
+    }
+  ]
+}

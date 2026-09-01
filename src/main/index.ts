@@ -1,6 +1,10 @@
 import { app, shell, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { registerQueue } from './queue'
+import { installPlugin } from './plugin'
+
+let disposeQueue: (() => void) | undefined
 
 function createWindow(): void {
   const window = new BrowserWindow({
@@ -38,11 +42,18 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
+  disposeQueue = registerQueue()
+  installPlugin()
   createWindow()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+
+app.on('will-quit', () => {
+  disposeQueue?.()
+  disposeQueue = undefined
 })
 
 app.on('window-all-closed', () => {

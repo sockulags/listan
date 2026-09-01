@@ -27,9 +27,11 @@ Verben är `add`, `list`, `next`, `check`, `rm` och `requeue`. `next` är det vi
 det svarar med aktiv rad plus nästa obockade steg, så att en agent aldrig behöver läsa
 hela listan.
 
-**API:t** är ett HTTP-lager på `127.0.0.1` som appen reser när den körs, så att fönstret
-uppdateras direkt när en agent skriver. När appen inte är igång går CLI:t direkt mot
-kärnan i stället, och fönstret läser upp det vid nästa start.
+**Fönstret** läser samma sqlite-fil och bevakar datakatalogen. När en agent skriver
+genom CLI:t märker huvudprocessen det och laddar om listan. Det ersätter det lokala
+HTTP-API:t som först var tänkt: samma resultat för användaren, betydligt mindre kod, och
+inget som kan sluta svara. Ett API blir intressant först om något utanför burken ska
+läsa kön.
 
 ## Distribution av plugin-paketet
 
@@ -40,7 +42,18 @@ Poängen är uppdateringen: mappen skrivs om från appens egna resurser vid varj
 så när `listan` uppdaterar sig får plugin-paketet den nya versionen utan att något
 publiceras separat och utan att du gör om något.
 
-Claude Code läser en marketplace från en lokal katalog, så där blir det den formen rakt
-av. Codex har ingen marketplace i samma mening; där pekas samma katalog ut som källa för
-prompts och skills. Exakt filformat pinnas när lagret byggs — det ska verifieras mot
-klienterna, inte gissas här.
+Katalogen skrivs i Claude Codes marketplace-form: `.claude-plugin/marketplace.json` i
+roten, ett plugin under `listan/` med sin egen `plugin.json`, och en skill under
+`listan/skills/listan/SKILL.md` som beskriver när och hur en agent ska skriva till kön.
+
+Codex har ingen marketplace i samma mening; där pekas samma katalog ut som källa för
+prompts och skills.
+
+**Detta är inte verifierat mot klienterna än.** Filerna är välformade och skrivs ut på
+rätt plats, men att Claude Code faktiskt accepterar marketplacen kräver att någon kör
+`/plugin marketplace add %APPDATA%\listan\plugin` en gång och ser efter. Gör det innan
+formen dokumenteras som färdig.
+
+Vid sidan av marketplacen skrivs en CLI-shim till `%APPDATA%\listan\bin`. Den kör
+`listan` genom appens egen Electron-binär med `ELECTRON_RUN_AS_NODE`, så CLI:t fungerar
+utan att Node finns installerat vid sidan om. Lägg mappen i PATH.
