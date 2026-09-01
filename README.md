@@ -68,7 +68,13 @@ historik.
 Nästa agent hämtar kvittot med `listan result <id> --format prompt`, eller så klistrar du
 in det själv från fönstret. En tråd som fortfarande lever kan i stället blockera på
 `listan wait <id>` och återupptas när du bockar av raden; medan den väntar märks raden i
-kön. Väntan kan stängas av i inställningarna.
+kön. Claude Code kör det i bakgrunden och klarar en halvtimme; Codex väntar i samma
+terminalsession och bör hålla sig till tio minuter. Väntan kan stängas av i
+inställningarna.
+
+Rader som pekar på en GitHub-PR stänger sig själva när PR:en är mergad eller stängd —
+som `auto-resolved`, aldrig som om du gjort arbetet. Det kräver att `gh` är inloggat och
+kan stängas av i inställningarna.
 
 Se [docs/agentyta.md](docs/agentyta.md) för formaten och avslutskoderna.
 
@@ -92,8 +98,9 @@ npm run dev
 `npm run build` typkollar och bygger både appen och CLI:t, `npm test` kör
 enhetstesterna, `npm run lint` lintar. CI kör alla tre på varje PR.
 
-Data ligger i `%APPDATA%\listan\listan.db` och kan pekas om genom att sätta `APPDATA`,
-vilket är hur CLI:t testas mot en slaskkatalog.
+Data ligger i `%APPDATA%\listan\listan.db`. Sätt `LISTAN_HOME` för att köra mot en
+slaskkatalog — peka inte om `APPDATA`, det flyttar även konfigurationen för andra verktyg
+som läser den, bland annat `gh`.
 
 ## Release
 
@@ -122,9 +129,9 @@ undantaget tas bort rakt av.
 
 ## Läge
 
-v0.5.0. Kärnan, CLI:t, fönstret, detaljfönstret, overlayn, kvittona, autouppdateringen
-och plugin-utskrivningen finns. GitHub-resolvern som stänger rader vars PR redan är
-mergad finns inte än. Se
+v0.6.0. Kärnan, CLI:t, fönstret, detaljfönstret, overlayn, kvittona, GitHub-resolvern,
+autouppdateringen och plugin-utskrivningen finns. Ingen leveransadapter skickar kvitton
+vidare än; tillåtlistan för webhook-mål finns på plats i väntan på det. Se
 [docs/design.md](docs/design.md) för designbriefen.
 
 Appikonen genereras ur paletten i stället för att ligga som binär i repot:

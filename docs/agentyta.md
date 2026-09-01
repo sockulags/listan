@@ -66,10 +66,22 @@ femte minut skickar om hela sin konversation varje gång, medan `wait` kostar et
 Inuti kommandot pollas sqlite-filen varje halvsekund, vilket är gratis eftersom ingen
 modell är inblandad.
 
-Kör det i bakgrunden där värden stöder det, så väcks sessionen när kommandot avslutas.
+Standard är trettio minuter och taket fyra timmar. Vad som är rimligt beror på värden:
 
-Väntan passar korta verifieringar. Standard är tio minuter och taket en timme; allt
-längre än så ska tråden dö och överlämningen ske med `--format prompt` i stället.
+**Claude Code** kör kommandot i bakgrunden och väcker sessionen när processen avslutas.
+Där kostar en halvtimmes väntan ingenting, och gränsen sätts i praktiken av
+prompt-cachen: återupptas tråden inom cachefönstret är det billigt, efter det betalar man
+en enda omläsning av tråden. Fortfarande långt billigare än pollning.
+
+**Codex** har ingen process-callback som återstartar en avslutad turn. Där väntar tråden
+kvar i samma terminalsession: första anropet lämnar tillbaka ett levande `session_id`, och
+agenten fortsätter vänta på samma session tills processen avslutas. En tyst väntan håller
+i ungefär fem minuter innan ett nytt verktygsanrop behövs, så tio minuter är den praktiska
+gränsen och `--timeout 10m` det som ska användas. En frikopplad bakgrundsprocess fungerar
+inte alls, för då finns ingen väg tillbaka för stdout.
+
+Allt som tar längre tid än så ska låta tråden dö; överlämningen sker med `--format prompt`
+till en ny tråd i stället.
 
 Medan någon väntar märks raden i gränssnittet. När du tömmer kön en måndagsmorgon är den
 raden den som någon sitter blockerad på.
@@ -90,13 +102,27 @@ Katalogen skrivs i Claude Codes marketplace-form: `.claude-plugin/marketplace.js
 roten, ett plugin under `listan/` med sin egen `plugin.json`, och en skill under
 `listan/skills/listan/SKILL.md` som beskriver när och hur en agent ska skriva till kön.
 
-Codex har ingen marketplace i samma mening; där pekas samma katalog ut som källa för
-prompts och skills.
+Kör `/plugin marketplace add %APPDATA%\listan\plugin` en gång i Claude Code.
 
-**Detta är inte verifierat mot klienterna än.** Filerna är välformade och skrivs ut på
-rätt plats, men att Claude Code faktiskt accepterar marketplacen kräver att någon kör
-`/plugin marketplace add %APPDATA%\listan\plugin` en gång och ser efter. Gör det innan
-formen dokumenteras som färdig.
+**Codex tar samma skill genom en symlänk.** Codex läser lokala skills från
+`%USERPROFILE%\.agents\skills\<namn>\SKILL.md` och följer symboliska länkar, så en länk
+dit räcker och fortsätter peka rätt när appen skriver om målkatalogen:
+
+```powershell
+$source = Join-Path $env:APPDATA 'listan\plugin\listan\skills\listan'
+$parent = Join-Path $HOME '.agents\skills'
+New-Item -ItemType Directory -Force -Path $parent | Out-Null
+New-Item -ItemType SymbolicLink -Path (Join-Path $parent 'listan') -Target $source
+```
+
+Det kräver Developer Mode eller rätt att skapa symlänkar. En ny tråd är den säkra gränsen
+för att ändringar ska synas.
+
+Codex har numera också en egen marketplace, med `.codex-plugin/plugin.json` i stället för
+`.claude-plugin`. Den vägen är medvetet inte vald: en installerad lokal Codex-plugin följer
+inte källkatalogens omskrivningar tillförlitligt, utan kräver versionshöjning och
+ominstallation vid varje uppdatering. Symlänkade skills gör det som var hela poängen —
+följer appversionen utan att någon gör om något.
 
 Vid sidan av marketplacen skrivs en CLI-shim till `%APPDATA%\listan\bin`. Den kör
 `listan` genom appens egen Electron-binär med `ELECTRON_RUN_AS_NODE`, så CLI:t fungerar

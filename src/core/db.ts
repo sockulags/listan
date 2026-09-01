@@ -62,6 +62,7 @@ const SCHEMA = `
 const ADDITIONS: Array<[string, string, string]> = [
   ['queue_rows', 'body', 'TEXT'],
   ['queue_rows', 'context', 'TEXT'],
+  ['queue_rows', 'webhook', 'TEXT'],
   ['queue_steps', 'expects', "TEXT NOT NULL DEFAULT 'none'"],
   ['queue_steps', 'answer', 'TEXT']
 ]

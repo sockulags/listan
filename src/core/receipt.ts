@@ -56,22 +56,36 @@ function answers(receipt: Receipt): string {
  */
 function prompt(receipt: Receipt): string {
   const lines = [
-    'Jag tar vid efter en tidigare agentsession som inte finns kvar. Här är resultatet',
-    'av det manuella arbete den lämnade över till mig.',
+    'Jag tar över ett arbete från en tidigare agentsession. Det som följer är ett kvitto',
+    'från den sessionen, inte arbete som jag själv har utfört.',
     '',
+    'Läs avslutskoden innan du agerar:',
+    '- completed: det manuella arbetet utfördes',
+    '- auto-resolved: behovet försvann utan att arbetet utfördes',
+    '- cancelled: arbetet utfördes inte',
+    '- superseded: raden ersattes och ska inte fortsättas',
+    '',
+    `**Rad-id:** ${receipt.rowId}`,
     `**Uppgift:** ${receipt.text}`
   ]
 
   if (receipt.link) lines.push(`**Länk:** ${receipt.link.target}`)
   if (receipt.context) lines.push(`**Sammanhang:** ${receipt.context}`)
 
-  lines.push(`**Utfall:** ${REASONS[receipt.reason]}`)
+  lines.push(`**Utfall:** ${receipt.reason} — ${REASONS[receipt.reason]}`)
   lines.push(`**Avslutad:** ${stamp(receipt.createdAt)}`)
 
   if (receipt.steps.length > 0) lines.push('', 'Vad som verifierades:', ...steps(receipt))
-  if (receipt.note) lines.push('', `Min notering: ${receipt.note}`)
+  // Not "the person who did the work" — an auto-resolved row carries a note the
+  // resolver wrote, and nobody did the work at all.
+  if (receipt.note) lines.push('', `Notering: ${receipt.note}`)
 
-  lines.push('', 'Fortsätt härifrån. Fråga om något är oklart i stället för att gissa.')
+  lines.push(
+    '',
+    'Fortsätt bara från det kvittot faktiskt visar. Tillskriv dig inte den tidigare',
+    'sessionens arbete. Kontrollera repots aktuella läge innan du ändrar något eller',
+    'gör något utåtriktat, och fråga hellre än gissar.'
+  )
 
   return lines.join('\n')
 }

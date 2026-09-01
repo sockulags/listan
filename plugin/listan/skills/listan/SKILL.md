@@ -63,9 +63,12 @@ listan add "Verifiera auth-flödet" \
 
 Använd `--fråga` sparsamt. Ett steg som du kan verifiera själv ska inte vara en fråga.
 
-`--kontext` är vad nästa agent behöver veta om du inte finns kvar när svaret kommer:
-repo, branch, vad du höll på med. `--brief` tar markdown som visas när raden öppnas i
-eget fönster — använd det när uppgiften behöver mer förklaring än en rad.
+`--kontext` är vad nästa agent behöver veta om du inte finns kvar när svaret kommer. Var
+konkret: repo och arbetskatalog, branch eller worktree, relevant commit, och vad du tänkt
+ska hända härnäst. Det är den enda kontext en ny tråd får.
+
+`--brief` tar markdown som visas när raden öppnas i eget fönster — använd det när
+uppgiften behöver mer förklaring än en rad.
 
 ## Hämta resultatet
 
@@ -77,13 +80,33 @@ utan att göras, `auto-resolved` att den löste sig själv, `superseded` att den
 Är du kvar och kan agera direkt på svaret kan du blockera på raden:
 
 ```bash
-listan wait <id> --timeout 10m
+listan wait <id> --timeout 30m
 ```
 
-Kör det i bakgrunden om värden stöder det. Det returnerar när raden avslutas och skriver
-då ut svaren; avslutar med kod 2 om tiden går ut och 3 om väntan är avstängd. Vänta bara
-när svaret kommer inom minuter och du faktiskt kan göra något med det — annars avsluta
-och låt Lucas lämna över kvittot till en ny tråd.
+Kommandot returnerar när raden avslutas och skriver då ut svaren. Vänta bara när du
+faktiskt kan göra något med svaret — annars avsluta och låt Lucas lämna över kvittot till
+en ny tråd.
+
+**I Claude Code:** kör det som ett bakgrundskommando. Sessionen väcks när processen
+avslutas, och en halvtimme kostar inget medan den väntar.
+
+**I Codex:** kör det i en sammanhängande terminalsession med `--timeout 10m`. Får du
+tillbaka ett levande `session_id` fortsätter du vänta på **samma** session tills processen
+avslutas. Starta aldrig en frikopplad bakgrundsprocess, och polla aldrig med nya
+`listan`-kommandon. Tio minuter är den praktiska gränsen; längre än så innebär många
+återinträden och är fel användning.
+
+### När väntan tar slut utan kvitto
+
+**Kod 2, tiden gick ut.** Raden är fortfarande öppen. Kör inte `rm`, `requeue` eller
+upprepade `result`. Rapportera rad-id, säg att inget kvitto finns än, och avsluta tråden:
+
+> Väntan avslutades utan kvitto. Raden `<id>` är fortfarande öppen och har inte tagits
+> bort eller lagts om. När den avslutas kan resultatet lämnas till en ny tråd med
+> `listan result <id> --format prompt`.
+
+**Kod 3, väntan är avstängd.** Samma sak, men avsluta direkt. Försök inte kringgå
+inställningen genom att polla.
 
 ## Läsa
 

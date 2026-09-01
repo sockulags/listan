@@ -6,6 +6,7 @@ import { registerOverlay } from './overlay'
 import { registerUpdater } from './updater'
 import { registerTheme, chrome } from './theme'
 import { registerPanes } from './panes'
+import { registerResolver } from './resolver'
 import { installPlugin } from './plugin'
 
 const WIDTH = 460
@@ -105,12 +106,14 @@ app.whenReady().then(() => {
   disposeUpdater = registerUpdater()
   const disposeHeight = registerAutoHeight()
   const disposePanes = registerPanes()
+  const disposeResolver = registerResolver()
   installPlugin()
   createWindow()
 
   app.on('will-quit', () => {
     disposeHeight()
     disposePanes()
+    disposeResolver()
   })
 
   app.on('activate', () => {

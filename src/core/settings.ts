@@ -16,6 +16,13 @@ export function readSettings(): Settings {
         typeof parsed.allowWaiting === 'boolean'
           ? parsed.allowWaiting
           : DEFAULT_SETTINGS.allowWaiting,
+      resolveGithub:
+        typeof parsed.resolveGithub === 'boolean'
+          ? parsed.resolveGithub
+          : DEFAULT_SETTINGS.resolveGithub,
+      webhookAllowlist: Array.isArray(parsed.webhookAllowlist)
+        ? parsed.webhookAllowlist.filter((entry): entry is string => typeof entry === 'string')
+        : [],
       theme:
         parsed.theme === 'light' || parsed.theme === 'dark' || parsed.theme === 'system'
           ? parsed.theme

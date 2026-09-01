@@ -18,12 +18,14 @@ const { Store, slug } = require('../core/store') as typeof import('../core/store
 const { render } = require('../core/receipt') as typeof import('../core/receipt')
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { readSettings } = require('../core/settings') as typeof import('../core/settings')
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { isAllowedWebhook } = require('../core/webhook') as typeof import('../core/webhook')
 
 const USAGE = `listan — kön för de manuella stegen dina agenter lämnar efter sig
 
   listan add <text> [--tab T] [--link URL] [--fil SÖKVÄG] [--kommando K]
                     [--step S ...] [--fråga F ...] [--brief MD] [--kontext K]
-                    [--källa K] [--batch B]
+                    [--källa K] [--batch B] [--webhook URL]
   listan add                     läser en rad per rad från stdin
   listan list [--tab T]
   listan next                    aktiv rad plus nästa obockade steg
@@ -32,7 +34,7 @@ const USAGE = `listan — kön för de manuella stegen dina agenter lämnar efte
   listan requeue <id> [--tab T]  skickar raden sist i sin flik
   listan result <id> [--format markdown|json|prompt|answers]
   listan results [--sedan MS] [--format ...]
-  listan wait <id> [--timeout 10m]
+  listan wait <id> [--timeout 30m]
 
   --step lägger ett steg, --fråga ett steg som vill ha ett skrivet svar.
   --brief är markdown som visas när raden öppnas i eget fönster.
@@ -40,11 +42,18 @@ const USAGE = `listan — kön för de manuella stegen dina agenter lämnar efte
   --json på valfritt kommando ger maskinläsbar utdata.
   Id:n får förkortas så länge prefixet är unikt.
 
-  wait blockerar tills raden avslutas och skriver då ut kvittot. Avslutar med
-  kod 2 om tiden går ut, 3 om väntan är avstängd i inställningarna.`
+  wait blockerar tills raden avslutas och skriver då ut kvittot. Standard 30m,
+  tak 4h. Kör det i bakgrunden om värden stöder det. Avslutar med kod 2 om
+  tiden går ut, 3 om väntan är avstängd i inställningarna.
 
-const WAIT_DEFAULT_MS = 10 * 60_000
-const WAIT_MAX_MS = 60 * 60_000
+  --webhook måste finnas i tillåtlistan i inställningarna, annars avvisas den.`
+
+// Half an hour by default because the common case is CI running against a test
+// environment and you confirming afterwards; ten minutes never covered that.
+// The ceiling is four hours — past the prompt cache, resuming costs one full
+// re-read of the thread, which is still far cheaper than polling would be.
+const WAIT_DEFAULT_MS = 30 * 60_000
+const WAIT_MAX_MS = 4 * 60 * 60_000
 const WAIT_POLL_MS = 500
 
 function short(row: Row): string {
@@ -148,6 +157,13 @@ async function main(): Promise<void> {
         batch: flag(parsed, 'batch')
       }
 
+      // A return target is checked before it is stored, so nothing downstream
+      // has to trust a string an agent picked.
+      const webhook = flag(parsed, 'webhook')
+      if (webhook && !isAllowedWebhook(webhook, readSettings().webhookAllowlist)) {
+        fail(`listan add: ${webhook} finns inte i tillåtlistan i inställningarna`)
+      }
+
       // Steps, a brief and a link belong to a single row, so they only apply
       // when one row is being added. A batch from stdin is bare lines.
       const single = texts.length === 1
@@ -159,6 +175,7 @@ async function main(): Promise<void> {
           link: single ? linkFrom(parsed) : undefined,
           body: single ? (flag(parsed, 'brief') ?? flag(parsed, 'body')) : undefined,
           context: single ? (flag(parsed, 'kontext') ?? flag(parsed, 'context')) : undefined,
+          webhook: single ? webhook : undefined,
           steps: single && steps.length > 0 ? steps : undefined
         })
       )

@@ -52,10 +52,32 @@ describe('prompt', () => {
   it('carries the context a new thread never had', () => {
     const out = render(RECEIPT, 'prompt')
 
-    expect(out).toContain('tidigare agentsession som inte finns kvar')
+    expect(out).toContain('tidigare agentsession')
+    expect(out).toContain('**Rad-id:** q1')
     expect(out).toContain('**Länk:** https://example.test/pull/57')
     expect(out).toContain('**Sammanhang:** smask, branch fix/auth')
-    expect(out).toContain('Fortsätt härifrån')
+  })
+
+  it('spells out every outcome code so the receiver can tell them apart', () => {
+    const out = render(RECEIPT, 'prompt')
+
+    for (const reason of ['completed', 'auto-resolved', 'cancelled', 'superseded']) {
+      expect(out).toContain(reason)
+    }
+  })
+
+  it('says outright that the work is not the receiving thread’s own', () => {
+    const out = render(RECEIPT, 'prompt')
+
+    expect(out).toContain('inte arbete som jag själv har utfört')
+    expect(out).toContain('Tillskriv dig inte den tidigare')
+    expect(out).toContain('Kontrollera repots aktuella läge')
+  })
+
+  it('names an auto-resolved row as one nobody did the work on', () => {
+    expect(render({ ...RECEIPT, reason: 'auto-resolved' }, 'prompt')).toContain(
+      '**Utfall:** auto-resolved'
+    )
   })
 })
 

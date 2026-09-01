@@ -63,6 +63,48 @@ export default function Settings(): React.JSX.Element {
             </span>
           </label>
 
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={values.resolveGithub}
+              onChange={(event) => save({ ...values, resolveGithub: event.target.checked })}
+              className="mt-0.5 size-[17px] shrink-0 cursor-pointer appearance-none rounded-[5px] border-[1.5px] border-border-strong bg-surface transition-colors duration-150 checked:border-accent checked:bg-accent"
+            />
+            <span className="flex flex-col gap-1">
+              <span className="text-[14.5px]">Stäng rader vars PR är avgjord</span>
+              <span className="text-xs leading-relaxed text-fg-subtle">
+                Rader som pekar på en GitHub-PR kontrolleras var femte minut med{' '}
+                <code className="rounded bg-surface-2 px-1">gh</code>. Är PR:en mergad eller stängd
+                avslutas raden som <em>auto-resolved</em>, aldrig som om du gjort arbetet. Går
+                kontrollen inte igenom lämnas raden i fred.
+              </span>
+            </span>
+          </label>
+
+          <div className="flex flex-col gap-2">
+            <span className="text-[14.5px]">Tillåtna webhook-mål</span>
+            <textarea
+              defaultValue={values.webhookAllowlist.join('\n')}
+              onBlur={(event) =>
+                save({
+                  ...values,
+                  webhookAllowlist: event.target.value
+                    .split('\n')
+                    .map((line) => line.trim())
+                    .filter(Boolean)
+                })
+              }
+              rows={3}
+              placeholder="https://hooks.example.se/listan"
+              className="resize-none rounded-md border border-border bg-surface px-2.5 py-2 font-mono text-[12.5px] outline-none transition-colors duration-150 placeholder:text-fg-subtle focus:border-border-strong"
+            />
+            <span className="text-xs leading-relaxed text-fg-subtle">
+              En adress per rad, https bara. En agent kan bara ange{' '}
+              <code className="rounded bg-surface-2 px-1">--webhook</code> mot något som står här.
+              Tom lista betyder att inga mål accepteras.
+            </span>
+          </div>
+
           <div className="flex flex-col gap-2">
             <span className="text-[14.5px]">Tema</span>
             <div className="flex gap-1.5">

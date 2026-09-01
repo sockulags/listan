@@ -7,6 +7,12 @@ import { join } from 'path'
  * two different answers would mean two different queues.
  */
 export function dataDir(): string {
+  // Repointing APPDATA to test against a scratch queue also moves the config of
+  // every other tool that reads it — gh among them, which quietly loses its
+  // login. This override moves listan and nothing else.
+  const override = process.env.LISTAN_HOME?.trim()
+  if (override) return override
+
   if (process.platform === 'win32') {
     return join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), 'listan')
   }

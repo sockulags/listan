@@ -38,6 +38,8 @@ export interface Row {
   body?: string
   /** What the next agent needs to know: repo, branch, what the thread was doing. */
   context?: string
+  /** Allowlisted return target for the receipt. Nothing delivers to it yet. */
+  webhook?: string
   steps: Step[]
   /** True while an agent thread is blocked on this row through `listan wait`. */
   awaited?: boolean
@@ -69,6 +71,7 @@ export interface Receipt {
   link?: RowLink
   source?: string
   context?: string
+  webhook?: string
   note?: string
   steps: Array<{ text: string; done: boolean; answer?: string }>
 }
@@ -76,10 +79,16 @@ export interface Receipt {
 export interface Settings {
   /** Whether an agent thread may block on a row through `listan wait`. */
   allowWaiting: boolean
+  /** Close rows on their own once their GitHub pull request is merged or closed. */
+  resolveGithub: boolean
+  /** Return targets an agent is allowed to name. Empty means none are. */
+  webhookAllowlist: string[]
   theme: 'system' | 'light' | 'dark'
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   allowWaiting: true,
+  resolveGithub: true,
+  webhookAllowlist: [],
   theme: 'system'
 }

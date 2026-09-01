@@ -17,6 +17,7 @@ export interface AddInput {
   batch?: string
   body?: string
   context?: string
+  webhook?: string
   steps?: Array<string | StepInput>
 }
 
@@ -38,6 +39,7 @@ interface RowRecord {
   batch: string | null
   body: string | null
   context: string | null
+  webhook: string | null
 }
 
 interface StepRecord {
@@ -49,7 +51,8 @@ interface StepRecord {
   answer: string | null
 }
 
-const ROW_COLUMNS = 'id, tab, position, text, link_kind, link_target, source, batch, body, context'
+const ROW_COLUMNS =
+  'id, tab, position, text, link_kind, link_target, source, batch, body, context, webhook'
 
 /** Tab ids are slugs so that `--tab Jobb` and `--tab jobb` mean the same pile. */
 export function slug(name: string): string {
@@ -119,7 +122,7 @@ export class Store {
         this.db
           .prepare(
             `SELECT r.id, r.tab, r.position, r.text, r.link_kind, r.link_target, r.source,
-                      r.batch, r.body, r.context
+                      r.batch, r.body, r.context, r.webhook
                FROM queue_rows r
                JOIN queue_tabs t ON t.id = r.tab
                ORDER BY t.position, r.position`
@@ -172,7 +175,7 @@ export class Store {
 
       this.db
         .prepare(
-          'UPDATE queue_rows SET text = ?, source = ?, batch = ?, body = ?, context = ? WHERE id = ?'
+          'UPDATE queue_rows SET text = ?, source = ?, batch = ?, body = ?, context = ?, webhook = ? WHERE id = ?'
         )
         .run(
           input.text,
@@ -180,6 +183,7 @@ export class Store {
           input.batch ?? null,
           input.body ?? null,
           input.context ?? null,
+          input.webhook ?? null,
           duplicate.id
         )
 
@@ -199,7 +203,7 @@ export class Store {
     this.db
       .prepare(
         `INSERT INTO queue_rows (${ROW_COLUMNS}, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         id,
@@ -212,6 +216,7 @@ export class Store {
         input.batch ?? null,
         input.body ?? null,
         input.context ?? null,
+        input.webhook ?? null,
         now
       )
 
@@ -410,6 +415,7 @@ export class Store {
       link: row.link,
       source: row.source,
       context: row.context,
+      webhook: row.webhook,
       note: note?.trim() || undefined,
       steps: row.steps.map((step) => ({
         text: step.text,
@@ -458,6 +464,7 @@ export class Store {
       batch: record.batch ?? undefined,
       body: record.body ?? undefined,
       context: record.context ?? undefined,
+      webhook: record.webhook ?? undefined,
       awaited: this.awaitedRows().has(record.id),
       steps: steps.map((step) => ({
         id: step.id,

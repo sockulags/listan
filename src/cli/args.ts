@@ -73,17 +73,22 @@ export function flags(parsed: Parsed, name: string): string[] {
 }
 
 /**
- * Durations as an agent would write them: `30s`, `10m`, or a bare number of
- * seconds. Anything unparseable falls back to the default rather than throwing.
+ * Durations as an agent would write them: `30s`, `45m`, `2h`, or a bare number
+ * of seconds. Anything unparseable falls back to the default rather than
+ * throwing.
  */
 export function duration(value: string | undefined, fallbackMs: number): number {
   if (!value) return fallbackMs
 
-  const match = value.trim().match(/^(\d+)\s*(s|m)?$/i)
+  const match = value.trim().match(/^(\d+)\s*(s|m|h)?$/i)
   if (!match) return fallbackMs
 
   const amount = Number(match[1])
-  return match[2]?.toLowerCase() === 'm' ? amount * 60_000 : amount * 1000
+  const unit = match[2]?.toLowerCase()
+
+  if (unit === 'h') return amount * 60 * 60_000
+  if (unit === 'm') return amount * 60_000
+  return amount * 1000
 }
 
 function splitOnce(token: string): [string, string | undefined] {
