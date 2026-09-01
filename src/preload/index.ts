@@ -9,6 +9,8 @@ export interface Snapshot {
 
 const api = {
   read: (): Promise<Snapshot> => ipcRenderer.invoke('queue:read'),
+  add: (text: string, tab?: string, link?: string): Promise<Snapshot> =>
+    ipcRenderer.invoke('queue:add', text, tab, link),
   setStep: (rowId: string, stepId: string, done: boolean): Promise<Snapshot> =>
     ipcRenderer.invoke('queue:setStep', rowId, stepId, done),
   remove: (id: string): Promise<Snapshot> => ipcRenderer.invoke('queue:remove', id),
@@ -18,6 +20,13 @@ const api = {
     ipcRenderer.invoke('queue:reorder', tab, ids),
   hideOverlay: (): Promise<void> => ipcRenderer.invoke('overlay:hide'),
   installUpdate: (): Promise<void> => ipcRenderer.invoke('update:install'),
+  setHeight: (height: number): void => ipcRenderer.send('window:height', height),
+  getTheme: (): Promise<boolean> => ipcRenderer.invoke('theme:get'),
+  onTheme: (listener: (dark: boolean) => void): (() => void) => {
+    const handler = (_event: unknown, dark: boolean): void => listener(dark)
+    ipcRenderer.on('theme:changed', handler)
+    return () => ipcRenderer.off('theme:changed', handler)
+  },
   onUpdateReady: (listener: (version: string) => void): (() => void) => {
     const handler = (_event: unknown, version: string): void => listener(version)
     ipcRenderer.on('update:ready', handler)

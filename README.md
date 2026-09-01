@@ -17,10 +17,14 @@ Agenter skriver till kön med CLI:t. Ett anrop räcker för en hel rad:
 listan add "Verifiera auth-flödet" --link https://github.com/sockulags/smask/pull/57 --step "kör smoke-testet lokalt" --step "kolla att session inte läcker" --step "merga"
 ```
 
-Fönstret visar kön. Rader utan steg är platta — klick öppnar länken, och kryssikonen
-till vänster tar bort raden när du är klar. Rader med steg fälls ut. När sista steget
+Fönstret visar kön och är lika högt som den — töms kön krymper fönstret. Rader utan steg
+är platta: klick öppnar länken, och kryssikonen till vänster tar bort raden när du är
+klar. Rader med steg ligger som infällda gröna block som fälls ut. När sista steget
 bockas försvinner raden, med sex sekunders ångra. I prio-fliken går rader att dra om;
 övriga flikar är högar utan inbördes ordning och går därför inte att sortera.
+
+Fältet längst ner lägger till en rad utan att gå via CLI:t. Klistrar du in en länk blir
+den radens länk och resten blir texten.
 
 `Ctrl+Shift+K` fäller upp den pinnade overlayn var du än är. Den ligger överst, tar inte
 fokus, och visar en rad i taget: aktiv rad, nästa obockade steg, och en grå rad med vad
@@ -94,7 +98,7 @@ undantaget tas bort rakt av.
 
 ## Läge
 
-v0.3.0. Kärnan, CLI:t, fönstret, overlayn, autouppdateringen och plugin-utskrivningen
+v0.4.0. Kärnan, CLI:t, fönstret, overlayn, autouppdateringen och plugin-utskrivningen
 finns. Se
 [docs/design.md](docs/design.md) för designbriefen.
 

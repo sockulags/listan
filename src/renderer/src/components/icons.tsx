@@ -47,6 +47,22 @@ export function CheckIcon(): React.JSX.Element {
   )
 }
 
+export function TickIcon(): React.JSX.Element {
+  return (
+    <svg {...base} width={11} height={11} strokeWidth={3}>
+      <path d="M5 12.5l4.5 4.5L19 7" />
+    </svg>
+  )
+}
+
+export function PlusIcon(): React.JSX.Element {
+  return (
+    <svg {...base} width={16} height={16} strokeWidth={2}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  )
+}
+
 export function ArrowIcon(): React.JSX.Element {
   return (
     <svg {...base} width={14} height={14} strokeWidth={2}>

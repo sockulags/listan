@@ -21,6 +21,11 @@ export function registerQueue(): () => void {
 
   ipcMain.handle('queue:read', () => snapshot())
 
+  ipcMain.handle('queue:add', (_event, text: string, tab?: string, link?: string) => {
+    store.add({ text, tab, link: link ? { kind: 'url', target: link } : undefined })
+    return snapshot()
+  })
+
   ipcMain.handle('queue:setStep', (_event, rowId: string, stepId: string, done: boolean) => {
     store.setStep(rowId, stepId, done)
     return snapshot()
@@ -68,6 +73,7 @@ export function registerQueue(): () => void {
     clearTimeout(pending)
     watcher.close()
     ipcMain.removeHandler('queue:read')
+    ipcMain.removeHandler('queue:add')
     ipcMain.removeHandler('queue:setStep')
     ipcMain.removeHandler('queue:remove')
     ipcMain.removeHandler('queue:requeue')

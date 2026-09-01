@@ -1,6 +1,7 @@
 import { BrowserWindow, globalShortcut, ipcMain, screen } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
+import { chrome } from './theme'
 
 /** Matches the overlay's own layout; the window is deliberately not resizable. */
 const WIDTH = 320
@@ -22,7 +23,7 @@ function create(): BrowserWindow {
     skipTaskbar: true,
     alwaysOnTop: true,
     show: false,
-    backgroundColor: '#faf9f7',
+    backgroundColor: chrome().background,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false

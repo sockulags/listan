@@ -16,6 +16,7 @@ klar-vy att gå till.
 ## Färg
 
 - **Bas**: varm off-white (`#FAF9F7`) ljust läge, djup varmgrå (`#1A1917`) mörkt läge.
+  Båda lägena följer systemtemat, inklusive färgen på fönsterknapparna.
 - **Accent**: djup skogsgrön (`#2D6A4F`-familjen). Används sparsamt: aktiv flik,
   aktiv rad, bockade steg.
 - Paletten är kopierad från referat, inte importerad. Två appar som delar palett ska
@@ -27,6 +28,19 @@ klar-vy att gå till.
 - Siffror i räknare och id får `tabular-nums`. Ingen monospace någonstans — det är en
   lugn app, inte ett utvecklarverktyg.
 
+## Fönstret
+
+Ingen grå OS-list ovanpå paletten: titelraden är dold och Windows ritar sina egna
+fönsterknappar över appens egen färg. Wordmarken och tangentgenvägen bor i det fältet,
+som också är dragytan.
+
+**Fönstret är lika högt som kön.** Höjden följer innehållet mellan 260 och 760 px, så
+att tömma listan krymper fönstret. En fast höjd lämnade flera hundra pixlar död yta
+under två rader, och det läste som att något saknades.
+
+Längst ner ligger ett enradsfält att lägga till i. Det förankrar layouten och gör appen
+användbar utan CLI:t. Klistrar du in en länk blir den radens länk och resten blir texten.
+
 ## Komponentspråk
 
 - Rundade hörn (8–12 px), generös whitespace.
@@ -34,8 +48,15 @@ klar-vy att gå till.
   som något att hantera. Klick på raden öppnar länken.
 - **Bara rader med steg får en chevron** och en räknare. Då syns direkt vilken rad som
   kräver händer.
-- **Den aktiva raden är hel mjukgrön yta** utan accentstreck i kanten. Stegen ligger på
-  samma yta så att raden läses som ett stycke.
+- **Raden med steg är ett infällt mjukgrönt block** med 8 px marginal i sidled och 10 px
+  radie, utan accentstreck i kanten. Stegen ligger på samma yta så att raden läses som
+  ett stycke som lyfts ur listan, inte som en markerad tabellrad.
+- **Kryssrutor är egna**, inte systemets. Systemets har en tyngre grå ram än allt annat
+  på ytan och är det enda odesignade elementet om man låter dem vara.
+- **Länkikonen tonar in vid hover.** En kolumn av identiska ikoner nedför listan är brus;
+  raden är ändå klickbar.
+- **Bara numerisk meta får `tabular-nums`.** `#34` och `1/3` ska ligga i kolumn, en
+  etikett som `release-agent` ska inte glesas ut.
 - **Flikarna är piller**, inte mappflikar. Bara prio-fliken är en ordnad kö; övriga är
   högar utan inbördes ordning.
 - **Agentkörningen är ett chip** med ikon och ord, aldrig bara ett grått id.
