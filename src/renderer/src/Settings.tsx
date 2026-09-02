@@ -1,24 +1,28 @@
 import { useEffect, useState } from 'react'
-import type { Settings as Values } from '@shared/types'
+import type { CliStatus, Settings as Values } from '@shared/types'
 
 const DRAG = { WebkitAppRegion: 'drag' } as React.CSSProperties
 
 export default function Settings(): React.JSX.Element {
   const [values, setValues] = useState<Values | null>(null)
   const [paths, setPaths] = useState<{ data: string; plugin: string } | null>(null)
+  const [cli, setCli] = useState<CliStatus | null>(null)
+  const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
 
     const load = async (): Promise<void> => {
-      const [settings, where] = await Promise.all([
+      const [settings, where, status] = await Promise.all([
         window.listan.getSettings(),
-        window.listan.paths()
+        window.listan.paths(),
+        window.listan.cliStatus()
       ])
       if (!alive) return
       setValues(settings)
       setPaths(where)
+      setCli(status)
     }
 
     load()
@@ -26,6 +30,15 @@ export default function Settings(): React.JSX.Element {
       alive = false
     }
   }, [])
+
+  async function addToPath(): Promise<void> {
+    setBusy(true)
+    try {
+      setCli(await window.listan.addCliToPath())
+    } finally {
+      setBusy(false)
+    }
+  }
 
   async function save(next: Values): Promise<void> {
     setValues(next)
@@ -122,6 +135,52 @@ export default function Settings(): React.JSX.Element {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <span className="text-[14.5px]">Kommandoraden</span>
+
+            {cli?.onPath ? (
+              <span className="text-xs leading-relaxed text-fg-subtle">
+                <code className="rounded bg-surface-2 px-1">listan</code> går att köra från
+                terminalen. En session som redan var igång måste startas om innan den ser det.
+              </span>
+            ) : (
+              <>
+                <span className="text-xs leading-relaxed text-fg-subtle">
+                  Dina agenter hittar inte <code className="rounded bg-surface-2 px-1">listan</code>{' '}
+                  förrän mappen nedan ligger på PATH. Knappen lägger dit den för din användare —
+                  appen ändrar aldrig din miljö på egen hand.
+                </span>
+                <button
+                  onClick={addToPath}
+                  disabled={!cli?.supported || busy}
+                  className="self-start rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-fg transition-opacity duration-150 hover:opacity-90 disabled:opacity-50"
+                >
+                  {busy ? 'Lägger till…' : 'Lägg till i PATH'}
+                </button>
+              </>
+            )}
+
+            {cli && !cli.shimExists && (
+              <span className="text-xs leading-relaxed text-warning">
+                Shimmen saknas i mappen. Den skrivs vid varje start — starta om appen.
+              </span>
+            )}
+
+            {cli && (
+              <div className="flex items-center gap-2">
+                <code className="min-w-0 flex-1 truncate rounded bg-surface-2 px-2 py-1.5 text-[12.5px] text-fg-muted">
+                  {cli.binDir}
+                </code>
+                <button
+                  onClick={() => copy('Bin', cli.binDir)}
+                  className="shrink-0 rounded-md border border-border-strong px-2.5 py-1.5 text-xs transition-colors duration-150 hover:bg-surface-2"
+                >
+                  {copied === 'Bin' ? 'Kopierat' : 'Kopiera'}
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-3">

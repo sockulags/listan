@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import type { Reason, Receipt, Row, Settings, Tab } from '../shared/types'
+import type { CliStatus, Reason, Receipt, Row, Settings, Tab } from '../shared/types'
 
 export interface Snapshot {
   tabs: Tab[]
@@ -30,6 +30,8 @@ const api = {
   getSettings: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
   setSettings: (next: Settings): Promise<Settings> => ipcRenderer.invoke('settings:set', next),
   paths: (): Promise<{ data: string; plugin: string }> => ipcRenderer.invoke('settings:paths'),
+  cliStatus: (): Promise<CliStatus> => ipcRenderer.invoke('cli:status'),
+  addCliToPath: (): Promise<CliStatus> => ipcRenderer.invoke('cli:addToPath'),
   requeue: (id: string, tab?: string): Promise<Snapshot> =>
     ipcRenderer.invoke('queue:requeue', id, tab),
   reorder: (tab: string, ids: string[]): Promise<Snapshot> =>

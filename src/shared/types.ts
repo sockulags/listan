@@ -76,6 +76,14 @@ export interface Receipt {
   steps: Array<{ text: string; done: boolean; answer?: string }>
 }
 
+/** Whether the CLI shim is reachable from a terminal started right now. */
+export interface CliStatus {
+  binDir: string
+  shimExists: boolean
+  onPath: boolean
+  supported: boolean
+}
+
 export interface Settings {
   /** Whether an agent thread may block on a row through `listan wait`. */
   allowWaiting: boolean

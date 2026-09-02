@@ -7,6 +7,7 @@ import { registerUpdater } from './updater'
 import { registerTheme, chrome } from './theme'
 import { registerPanes } from './panes'
 import { registerResolver } from './resolver'
+import { registerCli } from './cli'
 import { installPlugin } from './plugin'
 
 const WIDTH = 460
@@ -107,6 +108,7 @@ app.whenReady().then(() => {
   const disposeHeight = registerAutoHeight()
   const disposePanes = registerPanes()
   const disposeResolver = registerResolver()
+  const disposeCli = registerCli()
   installPlugin()
   createWindow()
 
@@ -114,6 +116,7 @@ app.whenReady().then(() => {
     disposeHeight()
     disposePanes()
     disposeResolver()
+    disposeCli()
   })
 
   app.on('activate', () => {

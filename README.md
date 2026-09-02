@@ -129,7 +129,7 @@ undantaget tas bort rakt av.
 
 ## Läge
 
-v0.6.0. Kärnan, CLI:t, fönstret, detaljfönstret, overlayn, kvittona, GitHub-resolvern,
+v0.7.0. Kärnan, CLI:t, fönstret, detaljfönstret, overlayn, kvittona, GitHub-resolvern,
 autouppdateringen och plugin-utskrivningen finns. Ingen leveransadapter skickar kvitton
 vidare än; tillåtlistan för webhook-mål finns på plats i väntan på det. Se
 [docs/design.md](docs/design.md) för designbriefen.
