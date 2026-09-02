@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-import { readFileSync } from 'fs'
-import type { Row, RowLink } from '../shared/types'
+import { readFileSync, watch } from 'fs'
+import type { Receipt, Row, RowLink } from '../shared/types'
+import { dataDir } from '../core/paths'
 import { duration, flag, parse } from './args'
 
 // node:sqlite prints an ExperimentalWarning the moment it is loaded, which
@@ -25,7 +26,7 @@ const USAGE = `listan — kön för de manuella stegen dina agenter lämnar efte
 
   listan add <text> [--tab T] [--link URL] [--fil SÖKVÄG] [--kommando K]
                     [--step S ...] [--fråga F ...] [--brief MD] [--kontext K]
-                    [--källa K] [--batch B] [--webhook URL]
+                    [--källa K] [--batch B] [--webhook URL] [--wait 30m]
   listan add                     läser en rad per rad från stdin
   listan list [--tab T]
   listan next                    aktiv rad plus nästa obockade steg
@@ -34,7 +35,7 @@ const USAGE = `listan — kön för de manuella stegen dina agenter lämnar efte
   listan requeue <id> [--tab T]  skickar raden sist i sin flik
   listan result <id> [--format markdown|json|prompt|answers]
   listan results [--sedan MS] [--format ...]
-  listan wait <id> [--timeout 30m]
+  listan wait <id> [--timeout 30m] [--väntare Namn]
 
   --step lägger ett steg, --fråga ett steg som vill ha ett skrivet svar.
   --brief är markdown som visas när raden öppnas i eget fönster.
@@ -42,6 +43,7 @@ const USAGE = `listan — kön för de manuella stegen dina agenter lämnar efte
   --json på valfritt kommando ger maskinläsbar utdata.
   Id:n får förkortas så länge prefixet är unikt.
 
+  --wait på add lägger raden och väntar på den i ett anrop, utan lucka emellan.
   wait blockerar tills raden avslutas och skriver då ut kvittot. Standard 30m,
   tak 4h. Kör det i bakgrunden om värden stöder det. Avslutar med kod 2 om
   tiden går ut, 3 om väntan är avstängd i inställningarna.
@@ -54,7 +56,9 @@ const USAGE = `listan — kön för de manuella stegen dina agenter lämnar efte
 // re-read of the thread, which is still far cheaper than polling would be.
 const WAIT_DEFAULT_MS = 30 * 60_000
 const WAIT_MAX_MS = 4 * 60 * 60_000
-const WAIT_POLL_MS = 500
+// The wait wakes on a change in the data directory; this is only the safety net
+// for the rare case a filesystem event is missed.
+const WAIT_RECHECK_MS = 2000
 
 function short(row: Row): string {
   return row.id.slice(0, 8)
@@ -70,7 +74,7 @@ function describe(row: Row): string {
   const counter = progress(row)
   if (counter) parts.push(counter)
   else if (row.source) parts.push(row.source)
-  if (row.awaited) parts.push('(någon väntar)')
+  if (row.waiter) parts.push(`(${row.waiter.label} väntar)`)
   return parts.join('  ')
 }
 
@@ -128,8 +132,97 @@ function fail(message: string, code = 1): never {
   process.exit(code)
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+/**
+ * Blocks until the row leaves the queue. It watches the data directory rather
+ * than reading in a tight loop — over a wait of hours that is thousands of
+ * pointless reads — and re-checks every couple of seconds in case an event is
+ * missed.
+ */
+function untilComplete(
+  store: InstanceType<typeof Store>,
+  rowId: string,
+  deadline: number
+): Promise<Receipt | null> {
+  return new Promise<Receipt | null>((resolve) => {
+    let settled = false
+
+    const finish = (receipt: Receipt | null): void => {
+      if (settled) return
+      settled = true
+      watcher?.close()
+      clearInterval(recheck)
+      clearTimeout(timer)
+      resolve(receipt)
+    }
+
+    const check = (): void => {
+      // The watcher schedules its checks on a short delay, so one can still be
+      // in flight after the wait is over and the database has been closed.
+      if (settled) return
+
+      const receipt = store.receiptForRow(rowId)
+      if (receipt) finish(receipt)
+    }
+
+    let watcher: ReturnType<typeof watch> | undefined
+    try {
+      watcher = watch(dataDir(), () => setTimeout(check, 50))
+    } catch {
+      // No watcher available; the interval below carries the whole load.
+    }
+
+    const recheck = setInterval(check, WAIT_RECHECK_MS)
+    const timer = setTimeout(() => finish(null), Math.max(0, deadline - Date.now()))
+
+    check()
+  })
+}
+
+/**
+ * Registers a waiter, blocks, and prints the receipt. Interrupting removes the
+ * waiter but never touches the row: a cancelled wait is not cancelled work.
+ */
+async function waitForRow(
+  store: InstanceType<typeof Store>,
+  row: Row,
+  parsed: ReturnType<typeof parse>,
+  timeoutValue: string | undefined
+): Promise<void> {
+  if (!readSettings().allowWaiting) {
+    fail('listan wait: väntan är avstängd i inställningarna', 3)
+  }
+
+  const timeout = Math.min(duration(timeoutValue, WAIT_DEFAULT_MS), WAIT_MAX_MS)
+  const label = flag(parsed, 'väntare') || flag(parsed, 'waiter') || 'En agent'
+  const waiter = store.addWaiter(row.id, timeout, label)
+
+  const release = (): void => {
+    try {
+      store.removeWaiter(waiter)
+    } catch {
+      // Shutting down; the waiter expires on its own either way.
+    }
+  }
+
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    process.on(signal, () => {
+      release()
+      process.exit(signal === 'SIGINT' ? 130 : 143)
+    })
+  }
+
+  try {
+    const receipt = await untilComplete(store, row.id, Date.now() + timeout)
+    if (receipt) {
+      process.stdout.write(`${render(receipt, formatOf(parsed, 'answers'))}
+`)
+      return
+    }
+  } finally {
+    release()
+  }
+
+  fail(`listan wait: tiden gick ut, raden ${short(row)} är fortfarande öppen`, 2)
 }
 
 async function main(): Promise<void> {
@@ -179,6 +272,16 @@ async function main(): Promise<void> {
           steps: single && steps.length > 0 ? steps : undefined
         })
       )
+
+      // --wait makes this one atomic call: nothing can finish the row in the
+      // gap between creating it and waiting on it, because there is no gap.
+      // The receipt is then the whole answer, so the row is not announced
+      // separately — a machine reader gets one document, not two.
+      const wait = flag(parsed, 'wait')
+      if (wait !== undefined && single) {
+        await waitForRow(store, added[0], parsed, wait)
+        break
+      }
 
       emit(added, added.map((row) => `+ ${describe(row)}`).join('\n'))
       break
@@ -307,42 +410,20 @@ async function main(): Promise<void> {
       const target = parsed.positional[0]
       if (!target) fail('listan wait: ange ett id')
 
-      if (!readSettings().allowWaiting) {
-        fail('listan wait: väntan är avstängd i inställningarna', 3)
-      }
-
-      // A waiting thread already knows what it asked for, so the small format
-      // is the right default here even though `result` defaults to the full one.
+      // A wait on a row that is already finished answers straight away rather
+      // than blocking for nothing.
       const existing = store.resolveReceipt(target)
       if (existing) {
-        process.stdout.write(`${render(existing, formatOf(parsed, 'answers'))}\n`)
+        process.stdout.write(`${render(existing, formatOf(parsed, 'answers'))}
+`)
         break
       }
 
       const row = store.resolve(target)
       if (!row) fail(`listan wait: hittade ingen rad för "${target}"`)
 
-      const timeout = Math.min(duration(flag(parsed, 'timeout'), WAIT_DEFAULT_MS), WAIT_MAX_MS)
-      const waiter = store.addWaiter(row.id, timeout)
-      const deadline = Date.now() + timeout
-
-      // Polling a local file every half second costs nothing; it is the agent
-      // re-invoking itself that is expensive, and this exists to avoid that.
-      try {
-        while (Date.now() < deadline) {
-          await sleep(WAIT_POLL_MS)
-
-          const receipt = store.receiptForRow(row.id)
-          if (receipt) {
-            process.stdout.write(`${render(receipt, formatOf(parsed, 'answers'))}\n`)
-            return
-          }
-        }
-      } finally {
-        store.removeWaiter(waiter)
-      }
-
-      return fail(`listan wait: tiden gick ut, raden ${short(row)} är fortfarande öppen`, 2)
+      await waitForRow(store, row, parsed, flag(parsed, 'timeout') ?? flag(parsed, 'wait'))
+      break
     }
 
     default:

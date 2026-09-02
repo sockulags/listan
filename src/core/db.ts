@@ -46,6 +46,7 @@ const SCHEMA = `
   CREATE TABLE IF NOT EXISTS waiters (
     id TEXT PRIMARY KEY,
     row_id TEXT NOT NULL,
+    label TEXT NOT NULL DEFAULT 'En agent',
     since INTEGER NOT NULL,
     expires_at INTEGER NOT NULL
   );
@@ -64,7 +65,8 @@ const ADDITIONS: Array<[string, string, string]> = [
   ['queue_rows', 'context', 'TEXT'],
   ['queue_rows', 'webhook', 'TEXT'],
   ['queue_steps', 'expects', "TEXT NOT NULL DEFAULT 'none'"],
-  ['queue_steps', 'answer', 'TEXT']
+  ['queue_steps', 'answer', 'TEXT'],
+  ['waiters', 'label', "TEXT NOT NULL DEFAULT 'En agent'"]
 ]
 
 /** The tabs a fresh queue starts with. Exactly one of them is ordered. */

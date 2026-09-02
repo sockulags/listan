@@ -236,25 +236,35 @@ describe('answers', () => {
 })
 
 describe('waiters', () => {
-  it('marks a row somebody is blocked on', () => {
+  it('marks a row somebody is blocked on, with who and until when', () => {
     const s = store()
     const row = s.add({ text: 'Verifiera auth-flödet' })
-    expect(s.rows('prio')[0].awaited).toBe(false)
+    expect(s.rows('prio')[0].waiter).toBeUndefined()
 
-    const waiter = s.addWaiter(row.id, 60_000)
-    expect(s.rows('prio')[0].awaited).toBe(true)
+    // A deadline in the future, since only live waiters are surfaced.
+    const base = Date.now()
+    const waiter = s.addWaiter(row.id, 60_000, 'Codex', base)
+    expect(s.rows('prio')[0].waiter).toEqual({ label: 'Codex', until: base + 60_000 })
 
     s.removeWaiter(waiter)
-    expect(s.rows('prio')[0].awaited).toBe(false)
+    expect(s.rows('prio')[0].waiter).toBeUndefined()
+  })
+
+  it('names an unlabelled waiter something rather than nothing', () => {
+    const s = store()
+    const row = s.add({ text: 'Verifiera auth-flödet' })
+    s.addWaiter(row.id, 60_000)
+
+    expect(s.rows('prio')[0].waiter?.label).toBe('En agent')
   })
 
   it('stops counting a waiter whose thread never came back', () => {
     const s = store()
     const row = s.add({ text: 'Verifiera auth-flödet' })
-    s.addWaiter(row.id, 60_000, 0)
+    s.addWaiter(row.id, 60_000, 'Codex', 0)
 
     s.prune(120_000)
-    expect(s.rows('prio')[0].awaited).toBe(false)
+    expect(s.rows('prio')[0].waiter).toBeUndefined()
   })
 })
 

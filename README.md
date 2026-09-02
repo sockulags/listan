@@ -52,6 +52,7 @@ så en agent som kör om sig själv inte lämnar dubbletter.
 | `listan result <id>`            | kvittot, `--format markdown\|json\|prompt\|answers`                              |
 | `listan results [--sedan MS]`   | alla kvitton i fönstret                                                          |
 | `listan wait <id> [--timeout]`  | blockerar tills raden avslutas, skriver då kvittot                               |
+| `listan add ... --wait 30m`     | lägger raden och väntar på den i ett anrop                                       |
 
 `--json` på valfritt kommando ger maskinläsbar utdata. Id:n får förkortas så länge
 prefixet är unikt.
@@ -66,9 +67,9 @@ Kvitton lever utanför kön och glöms efter fjorton dagar. Kön har fortfarande
 historik.
 
 Nästa agent hämtar kvittot med `listan result <id> --format prompt`, eller så klistrar du
-in det själv från fönstret. En tråd som fortfarande lever kan i stället blockera på
-`listan wait <id>` och återupptas när du bockar av raden; medan den väntar märks raden i
-kön. Claude Code kör det i bakgrunden och klarar en halvtimme; Codex väntar i samma
+in det själv från fönstret. En tråd som fortfarande lever kan i stället lägga raden och blockera på
+den i ett anrop med `listan add ... --wait 30m`, och återupptas när du bockar av raden.
+Medan den väntar visar kön vem som väntar och till när. Claude Code kör det i bakgrunden och klarar en halvtimme; Codex väntar i samma
 terminalsession och bör hålla sig till tio minuter. Väntan kan stängas av i
 inställningarna.
 
@@ -129,7 +130,7 @@ undantaget tas bort rakt av.
 
 ## Läge
 
-v0.7.0. Kärnan, CLI:t, fönstret, detaljfönstret, overlayn, kvittona, GitHub-resolvern,
+v0.8.0. Kärnan, CLI:t, fönstret, detaljfönstret, overlayn, kvittona, GitHub-resolvern,
 autouppdateringen och plugin-utskrivningen finns. Ingen leveransadapter skickar kvitton
 vidare än; tillåtlistan för webhook-mål finns på plats i väntan på det. Se
 [docs/design.md](docs/design.md) för designbriefen.

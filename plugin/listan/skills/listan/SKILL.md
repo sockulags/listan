@@ -77,29 +77,41 @@ avslutskoden: `completed` betyder att arbetet gjordes, `cancelled` att raden tog
 utan att göras, `auto-resolved` att den löste sig själv, `superseded` att den ersattes.
 **Att raden är borta betyder inte att arbetet gick bra.**
 
-Är du kvar och kan agera direkt på svaret kan du blockera på raden:
+## Vänta eller inte — bestäm uttryckligen
+
+Vänta **bara** när svaret behövs för att du ska kunna fortsätta den körning du är i. Då
+lägger du raden och väntar i ett anrop:
 
 ```bash
-listan wait <id> --timeout 30m
+listan add "Välj färg" \
+  --fråga "Vilken färg ska vi använda?" \
+  --kontext "svaret behövs för nästa implementation" \
+  --väntare Codex \
+  --wait 30m \
+  --json
 ```
 
-Kommandot returnerar när raden avslutas och skriver då ut svaren. Vänta bara när du
-faktiskt kan göra något med svaret — annars avsluta och låt Lucas lämna över kvittot till
-en ny tråd.
+Ett anrop, ingen lucka mellan att raden skapas och att någon väntar på den. Är svaret
+redan inne kommer det tillbaka omedelbart. `--väntare` är namnet Lucas ser i kön.
 
-**I Claude Code:** kör det som ett bakgrundskommando. Sessionen väcks när processen
-avslutas, och en halvtimme kostar inget medan den väntar.
+Kan svaret hanteras senare: skapa raden utan väntan, skriv tillräcklig `--kontext`, och
+avsluta körningen. Kvittot finns kvar i fjorton dagar och hämtas med `listan result`.
 
-**I Codex:** kör det i en sammanhängande terminalsession med `--timeout 10m`. Får du
-tillbaka ett levande `session_id` fortsätter du vänta på **samma** session tills processen
-avslutas. Starta aldrig en frikopplad bakgrundsprocess, och polla aldrig med nya
-`listan`-kommandon. Tio minuter är den praktiska gränsen; längre än så innebär många
-återinträden och är fel användning.
+**Polla aldrig.** Starta aldrig fler än en väntare för samma rad.
+
+**I Claude Code:** kör kommandot i bakgrunden. Sessionen väcks när processen avslutas.
+
+**I Codex:** kör det i en sammanhängande terminalsession och håll dig till `--wait 10m`.
+Får du tillbaka ett levande `session_id` fortsätter du vänta på **samma** session tills
+processen avslutas. Starta aldrig en frikopplad bakgrundsprocess — då finns ingen väg
+tillbaka för resultatet. Fyra timmar är tillåtet men meningslöst utan en riktig
+trådväckning.
 
 ### När väntan tar slut utan kvitto
 
-**Kod 2, tiden gick ut.** Raden är fortfarande öppen. Kör inte `rm`, `requeue` eller
-upprepade `result`. Rapportera rad-id, säg att inget kvitto finns än, och avsluta tråden:
+**Kod 2, tiden gick ut.** Det är inte ett misslyckat manuellt arbete — raden ligger kvar
+öppen och Lucas gör den när han hinner. Kör inte `rm`, `requeue` eller upprepade `result`.
+Rapportera rad-id och avsluta tråden:
 
 > Väntan avslutades utan kvitto. Raden `<id>` är fortfarande öppen och har inte tagits
 > bort eller lagts om. När den avslutas kan resultatet lämnas till en ny tråd med
@@ -107,6 +119,9 @@ upprepade `result`. Rapportera rad-id, säg att inget kvitto finns än, och avsl
 
 **Kod 3, väntan är avstängd.** Samma sak, men avsluta direkt. Försök inte kringgå
 inställningen genom att polla.
+
+Lova aldrig att något "skickas tillbaka" av sig självt. Det finns ingen automatisk
+trådväckning — antingen väntar du kvar, eller så hämtas kvittot i efterhand.
 
 ## Läsa
 

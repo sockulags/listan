@@ -38,6 +38,12 @@ function isNumeric(value: string): boolean {
   return /\d/.test(value) && !/[a-zA-ZåäöÅÄÖ]/.test(value)
 }
 
+const TIME = new Intl.DateTimeFormat('sv-SE', { hour: '2-digit', minute: '2-digit' })
+
+function clock(at: number): string {
+  return TIME.format(new Date(at))
+}
+
 /** A brief or a step that wants an answer is more than the queue should show. */
 function isRich(row: Row): boolean {
   return Boolean(row.body) || row.steps.some((step) => step.expects !== 'none')
@@ -271,9 +277,12 @@ export default function App(): React.JSX.Element {
               : {}
 
             const dragging = dragId === row.id ? 'opacity-40' : ''
-            const waiting = row.awaited && (
-              <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-soft-fg">
-                väntar
+            // Who is blocked and until when: the row somebody is stuck on is
+            // the one worth taking first, and the deadline says how long you
+            // have before they give up.
+            const waiting = row.waiter && (
+              <span className="shrink-0 whitespace-nowrap rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-soft-fg">
+                {row.waiter.label} väntar · till {clock(row.waiter.until)}
               </span>
             )
 

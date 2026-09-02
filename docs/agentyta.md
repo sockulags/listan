@@ -60,11 +60,20 @@ Fyra format på samma kvitto:
 
 ## Väntan
 
-`listan wait <id>` blockerar tills raden avslutas och skriver då ut kvittot. Det är
-avsiktligt ett _blockerande_ anrop och inte något agenten pollar: en agent som frågar var
-femte minut skickar om hela sin konversation varje gång, medan `wait` kostar ett anrop.
-Inuti kommandot pollas sqlite-filen varje halvsekund, vilket är gratis eftersom ingen
-modell är inblandad.
+`listan add ... --wait 30m` lägger raden och väntar på den i **ett** anrop. Det är den
+form agenter ska använda: utan den finns en lucka mellan att raden skapas och att någon
+väntar på den, och i den luckan kan raden hinna bli klar utan att någon lyssnar.
+`listan wait <id>` finns kvar för en rad som redan ligger i kön.
+
+Väntan är avsiktligt ett _blockerande_ anrop och inte något agenten pollar: en agent som
+frågar var femte minut skickar om hela sin konversation varje gång, medan väntan kostar
+ett anrop. Inuti kommandot bevakas datakatalogen, så processen väcks av själva
+skrivningen i stället för att läsa i en snurra; en kontroll varannan sekund finns kvar som
+skyddsnät om en filhändelse tappas.
+
+En väntare bär ett namn (`--väntare Codex`) och en tidsgräns, och kön visar båda:
+_Codex väntar · till 09:45_. Avbryter du väntan med Ctrl+C tas väntaren bort men raden
+lämnas orörd — en avbruten väntan är inte avbrutet arbete.
 
 Standard är trettio minuter och taket fyra timmar. Vad som är rimligt beror på värden:
 

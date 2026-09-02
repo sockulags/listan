@@ -1,6 +1,6 @@
 {
   "name": "listan",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Kön för de manuella stegen dina agenter lämnar efter sig.",
   "main": "./out/main/index.js",
   "bin": {

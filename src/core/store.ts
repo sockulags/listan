@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite'
 import { randomUUID } from 'crypto'
-import type { Expects, Reason, Receipt, Row, RowLink, Step, Tab } from '../shared/types'
+import type { Expects, Reason, Receipt, Row, RowLink, Step, Tab, Waiter } from '../shared/types'
 import { openDatabase, RECEIPT_TTL_MS } from './db'
 import { databasePath } from './paths'
 
@@ -333,11 +333,11 @@ export class Store {
    * when you drain the queue on a Monday, the row somebody is stuck on is the
    * one worth taking first.
    */
-  addWaiter(rowId: string, ttlMs: number, now = Date.now()): string {
+  addWaiter(rowId: string, ttlMs: number, label = 'En agent', now = Date.now()): string {
     const id = randomUUID()
     this.db
-      .prepare('INSERT INTO waiters (id, row_id, since, expires_at) VALUES (?, ?, ?, ?)')
-      .run(id, rowId, now, now + ttlMs)
+      .prepare('INSERT INTO waiters (id, row_id, label, since, expires_at) VALUES (?, ?, ?, ?, ?)')
+      .run(id, rowId, label, now, now + ttlMs)
     return id
   }
 
@@ -354,12 +354,21 @@ export class Store {
     this.db.prepare('DELETE FROM waiters WHERE expires_at < ?').run(now)
   }
 
-  private awaitedRows(now = Date.now()): Set<string> {
+  /**
+   * The live waiters, newest first per row. The window shows the label and the
+   * deadline: knowing somebody is blocked until 09:45 is what tells you which
+   * row to take first on a Monday.
+   */
+  private waiters(now = Date.now()): Map<string, Waiter> {
     const records = this.db
-      .prepare('SELECT DISTINCT row_id FROM waiters WHERE expires_at > ?')
-      .all(now) as unknown as Array<{ row_id: string }>
+      .prepare('SELECT row_id, label, expires_at FROM waiters WHERE expires_at > ? ORDER BY since')
+      .all(now) as unknown as Array<{ row_id: string; label: string; expires_at: number }>
 
-    return new Set(records.map((record) => record.row_id))
+    const live = new Map<string, Waiter>()
+    for (const record of records) {
+      live.set(record.row_id, { label: record.label, until: record.expires_at })
+    }
+    return live
   }
 
   /** Sends a row to the back of its tab, or to the back of another tab. */
@@ -465,7 +474,7 @@ export class Store {
       body: record.body ?? undefined,
       context: record.context ?? undefined,
       webhook: record.webhook ?? undefined,
-      awaited: this.awaitedRows().has(record.id),
+      waiter: this.waiters().get(record.id),
       steps: steps.map((step) => ({
         id: step.id,
         text: step.text,

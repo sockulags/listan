@@ -50,8 +50,14 @@ export function parse(argv: string[]): Parsed {
       continue
     }
 
-    const value = inlineValue ?? argv[++index]
-    if (value === undefined) continue
+    // A flag never swallows the one after it: `--wait --json` leaves wait
+    // without a value rather than eating --json, so a bare flag can still mean
+    // "use the default".
+    let value = inlineValue
+    if (value === undefined) {
+      const next = argv[index + 1]
+      value = next === undefined || next.startsWith('--') ? '' : argv[++index]
+    }
 
     if (REPEATABLE.has(name)) {
       ;(parsed.flags[name] ??= []).push(value)

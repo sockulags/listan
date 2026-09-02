@@ -58,7 +58,25 @@ describe('parse', () => {
     expect(parsed.positional).toEqual(['--inte-en-flagga'])
   })
 
-  it('ignores a trailing flag with no value', () => {
-    expect(flag(parse(['add', 'x', '--tab']), 'tab')).toBeUndefined()
+  it('reads a trailing flag with no value as present but empty', () => {
+    expect(flag(parse(['add', 'x', '--tab']), 'tab')).toBe('')
+    expect(flag(parse(['add', 'x']), 'tab')).toBeUndefined()
+  })
+})
+
+describe('flags that take a value', () => {
+  it('does not swallow the flag that follows a bare one', () => {
+    const parsed = parse(['add', 'x', '--wait', '--json'])
+
+    expect(flag(parsed, 'wait')).toBe('')
+    expect(parsed.bare.has('json')).toBe(true)
+  })
+
+  it('falls back to the default duration for a bare --wait', () => {
+    expect(duration(flag(parse(['add', 'x', '--wait', '--json']), 'wait'), 42)).toBe(42)
+  })
+
+  it('still reads a value that is there', () => {
+    expect(flag(parse(['add', 'x', '--wait', '30m']), 'wait')).toBe('30m')
   })
 })

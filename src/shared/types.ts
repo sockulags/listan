@@ -41,8 +41,14 @@ export interface Row {
   /** Allowlisted return target for the receipt. Nothing delivers to it yet. */
   webhook?: string
   steps: Step[]
-  /** True while an agent thread is blocked on this row through `listan wait`. */
-  awaited?: boolean
+  /** Set while an agent thread is blocked on this row through `listan wait`. */
+  waiter?: Waiter
+}
+
+/** Who is blocked on a row, and how long they intend to stay. */
+export interface Waiter {
+  label: string
+  until: number
 }
 
 export interface Tab {
