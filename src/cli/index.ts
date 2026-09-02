@@ -34,7 +34,7 @@ const USAGE = `listan — kön för de manuella stegen dina agenter lämnar efte
   listan rm <id>                 tar bort raden som avbruten
   listan requeue <id> [--tab T]  skickar raden sist i sin flik
   listan result <id> [--format markdown|json|prompt|answers]
-  listan results [--sedan MS] [--format ...]
+  listan results [--sedan idag|7d] [--format ...]
   listan wait <id> [--timeout 30m] [--väntare Namn]
 
   --step lägger ett steg, --fråga ett steg som vill ha ett skrivet svar.
@@ -125,6 +125,25 @@ function formatOf(
     return value
   }
   return parsed.bare.has('json') ? 'json' : fallback
+}
+
+/**
+ * `--sedan` the way you would say it: `idag`, `7d`, or a raw timestamp. Anything
+ * else means everything that is still kept.
+ */
+function since(value: string | undefined): number {
+  if (!value) return 0
+
+  if (value === 'idag' || value === 'today') {
+    const now = new Date()
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  }
+
+  const days = value.match(/^(\d+)\s*d$/i)
+  if (days) return Date.now() - Number(days[1]) * 24 * 60 * 60 * 1000
+
+  const stamp = Number(value)
+  return Number.isFinite(stamp) ? stamp : 0
 }
 
 function fail(message: string, code = 1): never {
@@ -386,8 +405,7 @@ async function main(): Promise<void> {
     }
 
     case 'results': {
-      const since = Number(flag(parsed, 'sedan') ?? flag(parsed, 'since') ?? 0)
-      const receipts = store.receipts(Number.isFinite(since) ? since : 0)
+      const receipts = store.receipts(since(flag(parsed, 'sedan') ?? flag(parsed, 'since')))
 
       if (json) {
         emit(receipts, '')

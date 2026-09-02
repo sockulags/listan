@@ -50,7 +50,7 @@ så en agent som kör om sig själv inte lämnar dubbletter.
 | `listan rm <id>`                | tar bort raden som avbruten                                                      |
 | `listan requeue <id> [--tab T]` | skickar raden sist i sin flik                                                    |
 | `listan result <id>`            | kvittot, `--format markdown\|json\|prompt\|answers`                              |
-| `listan results [--sedan MS]`   | alla kvitton i fönstret                                                          |
+| `listan results [--sedan idag]` | kvitton i fönstret, `idag` eller `7d`                                            |
 | `listan wait <id> [--timeout]`  | blockerar tills raden avslutas, skriver då kvittot                               |
 | `listan add ... --wait 30m`     | lägger raden och väntar på den i ett anrop                                       |
 
@@ -63,8 +63,10 @@ En rad som lämnar kön lämnar ett kvitto: vad som gjordes, vad du svarade, din
 och **varför** raden försvann — gjord, avbruten, självlöst eller ersatt. Utan den sista
 delen läser en agent "raden är borta" som "arbetet gick bra".
 
-Kvitton lever utanför kön och glöms efter fjorton dagar. Kön har fortfarande ingen
-historik.
+Kvitton lever utanför kön och glöms efter fjorton dagar. Fliken **Klar** visar dem —
+idag, sju dagar eller allt som finns kvar — med utfallet utskrivet, så det syns vad du
+gjorde och vad som löste sig självt. Det är ingen historik som kön för; det är kvittona
+som redan fanns, nu synliga.
 
 Nästa agent hämtar kvittot med `listan result <id> --format prompt`, eller så klistrar du
 in det själv från fönstret. En tråd som fortfarande lever kan i stället lägga raden och blockera på
@@ -130,7 +132,7 @@ undantaget tas bort rakt av.
 
 ## Läge
 
-v0.8.0. Kärnan, CLI:t, fönstret, detaljfönstret, overlayn, kvittona, GitHub-resolvern,
+v0.9.0. Kärnan, CLI:t, fönstret, detaljfönstret, overlayn, kvittona, GitHub-resolvern,
 autouppdateringen och plugin-utskrivningen finns. Ingen leveransadapter skickar kvitton
 vidare än; tillåtlistan för webhook-mål finns på plats i väntan på det. Se
 [docs/design.md](docs/design.md) för designbriefen.

@@ -45,6 +45,9 @@ export function registerQueue(): () => void {
 
   ipcMain.handle('queue:receiptForRow', (_event, rowId: string) => store.receiptForRow(rowId))
 
+  // Newest first: the done view is read from the top, unlike the queue.
+  ipcMain.handle('queue:receipts', (_event, since: number) => store.receipts(since).reverse())
+
   ipcMain.handle('queue:render', (_event, receipt: Receipt, format: Format) =>
     render(receipt, format)
   )
@@ -96,6 +99,7 @@ export function registerQueue(): () => void {
     ipcMain.removeHandler('queue:row')
     ipcMain.removeHandler('queue:complete')
     ipcMain.removeHandler('queue:receiptForRow')
+    ipcMain.removeHandler('queue:receipts')
     ipcMain.removeHandler('queue:render')
     ipcMain.removeHandler('queue:setStep')
     ipcMain.removeHandler('queue:remove')

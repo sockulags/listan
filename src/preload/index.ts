@@ -21,12 +21,14 @@ const api = {
     ipcRenderer.invoke('queue:complete', id, reason, note),
   receiptForRow: (rowId: string): Promise<Receipt | null> =>
     ipcRenderer.invoke('queue:receiptForRow', rowId),
+  receipts: (since: number): Promise<Receipt[]> => ipcRenderer.invoke('queue:receipts', since),
   renderReceipt: (receipt: Receipt, format: string): Promise<string> =>
     ipcRenderer.invoke('queue:render', receipt, format),
   openRow: (id: string): Promise<void> => ipcRenderer.invoke('panes:openRow', id),
   openSettings: (): Promise<void> => ipcRenderer.invoke('panes:openSettings'),
   closePane: (): Promise<void> => ipcRenderer.invoke('panes:close'),
   copy: (text: string): Promise<void> => ipcRenderer.invoke('clipboard:write', text),
+  openLink: (target: string): Promise<boolean> => ipcRenderer.invoke('link:open', target),
   getSettings: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
   setSettings: (next: Settings): Promise<Settings> => ipcRenderer.invoke('settings:set', next),
   paths: (): Promise<{ data: string; plugin: string }> => ipcRenderer.invoke('settings:paths'),

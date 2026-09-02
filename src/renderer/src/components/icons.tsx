@@ -63,6 +63,15 @@ export function PlusIcon(): React.JSX.Element {
   )
 }
 
+export function CopyIcon(): React.JSX.Element {
+  return (
+    <svg {...base} width={16} height={16}>
+      <rect x="9" y="9" width="11" height="11" rx="2.5" />
+      <path d="M15 9V6.5A2.5 2.5 0 0 0 12.5 4H6.5A2.5 2.5 0 0 0 4 6.5v6A2.5 2.5 0 0 0 6.5 15H9" />
+    </svg>
+  )
+}
+
 export function WindowIcon(): React.JSX.Element {
   return (
     <svg {...base} width={16} height={16}>

@@ -10,8 +10,12 @@ Inga onödiga ramar och skuggor — en ram _eller_ en skugga, aldrig båda.
 ## Vad listan är
 
 En rad är en länk plus noll till några manuella steg. Rader är temporära: de skapas
-av en agent eller av dig, töms, och tas bort. Det finns ingen historik och ingen
-klar-vy att gå till.
+av en agent eller av dig, töms, och tas bort. Kön för ingen historik — den vet bara vad
+som är kvar att göra.
+
+Det som lämnar kön lämnar ett kvitto, och kvittona går att se i Klar-fliken tills de
+glöms efter fjorton dagar. Skillnaden är inte hårfin: kön är alltid bara det som
+återstår, medan kvittona är ett leveransminne med en egen bortre gräns.
 
 ## Färg
 
@@ -88,6 +92,19 @@ fram mitt i något annat utan att avbryta det.
 Skogsgrön rundad kvadrat med en gräddvit bock, genererad ur paletten av
 `scripts/make-icon.mjs`. Bocken är det enda som ryms vid 16 px; allt mer detaljerat blir
 grumligt i aktivitetsfältet.
+
+## Klar-fliken
+
+Sist bland flikarna, avskild från de andra, ligger en vy över kvittona. Den är inte en
+kö och ska inte läsas som en: inga kryssrutor, ingen ordning att pilla på, inget att
+lägga till. Rader visas med klockslag, utfall och dina svar, grupperade per dag när
+perioden är längre än idag.
+
+Utfallet skrivs ut för allt utom `completed`. Att blanda ihop det du gjorde med det som
+löste sig självt vore att svara fel på frågan fliken finns för.
+
+Detta bryter inte mot att kön saknar historik. Kvittona fanns redan och glöms efter
+fjorton dagar; det enda som ändrats är att de går att se.
 
 ## Vad som medvetet inte finns
 

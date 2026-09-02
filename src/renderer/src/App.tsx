@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Row } from '@shared/types'
 import { useQueue } from './useQueue'
+import Done, { type Period } from './Done'
 import {
   ChevronIcon,
   CheckIcon,
@@ -12,6 +13,9 @@ import {
   TickIcon,
   WindowIcon
 } from './components/icons'
+
+/** The done view is not one of the queue's tabs; it is a view onto receipts. */
+const DONE = '__klar__'
 
 /** How long a finished row stays undoable before the receipt is written. */
 const UNDO_MS = 6000
@@ -59,6 +63,8 @@ export default function App(): React.JSX.Element {
   const [overId, setOverId] = useState<string | null>(null)
   const [updateReady, setUpdateReady] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
+  const [period, setPeriod] = useState<Period>('idag')
+  const [doneToday, setDoneToday] = useState(0)
 
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const noteRef = useRef('')
@@ -69,6 +75,26 @@ export default function App(): React.JSX.Element {
   // A staged update installs on its own the next time the app quits; the line
   // at the bottom is only there for when you would rather have it now.
   useEffect(() => window.listan.onUpdateReady(setUpdateReady), [])
+
+  // How much left the queue today, for the badge on the done tab.
+  useEffect(() => {
+    let alive = true
+
+    const count = async (): Promise<void> => {
+      const now = new Date()
+      const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+      const receipts = await window.listan.receipts(midnight)
+      if (alive) setDoneToday(receipts.length)
+    }
+
+    const off = window.listan.onChanged(count)
+    count()
+
+    return () => {
+      alive = false
+      off()
+    }
+  }, [])
 
   // The window is as tall as the queue: chrome plus however much list there is,
   // clamped in the main process. Draining the queue shrinks the window.
@@ -101,6 +127,7 @@ export default function App(): React.JSX.Element {
   // Until a tab is picked, the first one is shown. Deriving it rather than
   // storing it keeps the two in sync when tabs appear from the CLI.
   const activeTab = selectedTab ?? snapshot.tabs[0]?.id ?? null
+  const showingDone = activeTab === DONE
   const sortable = snapshot.tabs.find((tab) => tab.id === activeTab)?.ordered ?? false
 
   /**
@@ -236,9 +263,22 @@ export default function App(): React.JSX.Element {
               </button>
             )
           })}
+
+          {/* Not one of the queue's tabs: a view onto the receipts that already
+              exist, set apart at the far end so it does not read as a pile of
+              work waiting for you. */}
+          <button
+            onClick={() => setSelectedTab(DONE)}
+            className={`ml-auto rounded-full px-3 py-1 text-[13.5px] transition-colors duration-150 ${
+              showingDone ? 'bg-surface-2 font-medium text-fg-muted' : 'text-fg-subtle'
+            }`}
+          >
+            Klar
+            {doneToday > 0 && <span className="ml-1.5 tabular-nums opacity-70">{doneToday}</span>}
+          </button>
         </nav>
 
-        {run && (
+        {run && !showingDone && (
           <div className="px-4 pb-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-xs font-medium text-fg-subtle">
               <RunIcon />
@@ -250,164 +290,169 @@ export default function App(): React.JSX.Element {
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div ref={listRef}>
-          {preview.length === 0 && (
+          {showingDone && <Done period={period} onPeriod={setPeriod} />}
+
+          {!showingDone && preview.length === 0 && (
             <p className="px-4 py-8 text-center text-sm text-fg-subtle">
               Inget väntar på dina händer.
             </p>
           )}
 
-          {preview.map((row) => {
-            const rich = isRich(row)
-            const hasSteps = row.steps.length > 0
-            const open = hasSteps && !rich && expanded === row.id
-            const done = row.steps.filter((step) => step.done).length
+          {!showingDone &&
+            preview.map((row) => {
+              const rich = isRich(row)
+              const hasSteps = row.steps.length > 0
+              const open = hasSteps && !rich && expanded === row.id
+              const done = row.steps.filter((step) => step.done).length
 
-            const dragProps = sortable
-              ? {
-                  draggable: true,
-                  onDragStart: () => setDragId(row.id),
-                  onDragEnter: () => setOverId(row.id),
-                  onDragOver: (event: React.DragEvent) => event.preventDefault(),
-                  onDragEnd: () => {
-                    setDragId(null)
-                    setOverId(null)
-                  },
-                  onDrop: drop
-                }
-              : {}
+              const dragProps = sortable
+                ? {
+                    draggable: true,
+                    onDragStart: () => setDragId(row.id),
+                    onDragEnter: () => setOverId(row.id),
+                    onDragOver: (event: React.DragEvent) => event.preventDefault(),
+                    onDragEnd: () => {
+                      setDragId(null)
+                      setOverId(null)
+                    },
+                    onDrop: drop
+                  }
+                : {}
 
-            const dragging = dragId === row.id ? 'opacity-40' : ''
-            // Who is blocked and until when: the row somebody is stuck on is
-            // the one worth taking first, and the deadline says how long you
-            // have before they give up.
-            const waiting = row.waiter && (
-              <span className="shrink-0 whitespace-nowrap rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-soft-fg">
-                {row.waiter.label} väntar · till {clock(row.waiter.until)}
-              </span>
-            )
+              const dragging = dragId === row.id ? 'opacity-40' : ''
+              // Who is blocked and until when: the row somebody is stuck on is
+              // the one worth taking first, and the deadline says how long you
+              // have before they give up.
+              const waiting = row.waiter && (
+                <span className="shrink-0 whitespace-nowrap rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-soft-fg">
+                  {row.waiter.label} väntar · till {clock(row.waiter.until)}
+                </span>
+              )
 
-            if (!hasSteps && !rich) {
+              if (!hasSteps && !rich) {
+                return (
+                  <div
+                    key={row.id}
+                    {...dragProps}
+                    className={`group flex items-center gap-3.5 border-t border-border px-4 py-3.5 text-[15px] transition-opacity duration-150 ${dragging}`}
+                  >
+                    {/* The glyph says where the row came from; hovering turns that
+                      same slot into the control that finishes it. */}
+                    <span className="relative size-[18px] shrink-0">
+                      <span className="absolute inset-0 text-fg-subtle group-focus-within:opacity-0 group-hover:opacity-0">
+                        {row.link ? <PullRequestIcon /> : <RunIcon />}
+                      </span>
+                      <button
+                        onClick={() => finish(row)}
+                        aria-label="Markera klar"
+                        className="absolute inset-0 text-fg-subtle opacity-0 transition-colors duration-150 hover:text-accent group-focus-within:opacity-100 group-hover:opacity-100"
+                      >
+                        <CheckIcon />
+                      </button>
+                    </span>
+                    <button
+                      onClick={() => row.link && window.listan.open(row.id)}
+                      disabled={!row.link}
+                      className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:cursor-default"
+                    >
+                      <span className="min-w-0 flex-1 truncate">{row.text}</span>
+                      {waiting}
+                      {row.source && (
+                        <span
+                          className={`shrink-0 text-[13px] text-fg-subtle ${
+                            isNumeric(row.source) ? 'tabular-nums' : ''
+                          }`}
+                        >
+                          {row.source}
+                        </span>
+                      )}
+                      {row.link && (
+                        <span className="shrink-0 text-fg-subtle opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100">
+                          <OpenIcon />
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                )
+              }
+
               return (
                 <div
                   key={row.id}
                   {...dragProps}
-                  className={`group flex items-center gap-3.5 border-t border-border px-4 py-3.5 text-[15px] transition-opacity duration-150 ${dragging}`}
+                  className={`group mx-2 my-1.5 rounded-[10px] bg-accent-soft transition-opacity duration-150 ${dragging}`}
                 >
-                  {/* The glyph says where the row came from; hovering turns that
-                      same slot into the control that finishes it. */}
-                  <span className="relative size-[18px] shrink-0">
-                    <span className="absolute inset-0 text-fg-subtle group-focus-within:opacity-0 group-hover:opacity-0">
-                      {row.link ? <PullRequestIcon /> : <RunIcon />}
-                    </span>
+                  <div className="flex w-full items-center gap-3 px-3 py-3 text-[15px] text-accent-soft-fg">
+                    {/* A rich row opens in its own window; the queue only shows
+                      that it is one and how far it has come. */}
                     <button
-                      onClick={() => finish(row)}
-                      aria-label="Markera klar"
-                      className="absolute inset-0 text-fg-subtle opacity-0 transition-colors duration-150 hover:text-accent group-focus-within:opacity-100 group-hover:opacity-100"
+                      onClick={() =>
+                        rich ? window.listan.openRow(row.id) : setExpanded(open ? null : row.id)
+                      }
+                      aria-expanded={rich ? undefined : open}
+                      aria-label={rich ? 'Öppna i eget fönster' : open ? 'Fäll ihop' : 'Fäll ut'}
+                      className={`shrink-0 text-accent transition-transform duration-200 ${
+                        rich || open ? '' : '-rotate-90'
+                      }`}
                     >
-                      <CheckIcon />
+                      {rich ? <WindowIcon /> : <ChevronIcon />}
                     </button>
-                  </span>
-                  <button
-                    onClick={() => row.link && window.listan.open(row.id)}
-                    disabled={!row.link}
-                    className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:cursor-default"
-                  >
-                    <span className="min-w-0 flex-1 truncate">{row.text}</span>
-                    {waiting}
-                    {row.source && (
-                      <span
-                        className={`shrink-0 text-[13px] text-fg-subtle ${
-                          isNumeric(row.source) ? 'tabular-nums' : ''
-                        }`}
-                      >
-                        {row.source}
-                      </span>
-                    )}
-                    {row.link && (
-                      <span className="shrink-0 text-fg-subtle opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100">
-                        <OpenIcon />
-                      </span>
-                    )}
-                  </button>
+                    <button
+                      onClick={() =>
+                        rich
+                          ? window.listan.openRow(row.id)
+                          : row.link && window.listan.open(row.id)
+                      }
+                      disabled={!rich && !row.link}
+                      className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:cursor-default"
+                    >
+                      <span className="min-w-0 flex-1 truncate font-medium">{row.text}</span>
+                      {waiting}
+                      {hasSteps && (
+                        <span className="shrink-0 text-[13px] tabular-nums text-accent">
+                          {done}/{row.steps.length}
+                        </span>
+                      )}
+                      {!rich && row.link && (
+                        <span className="shrink-0 text-accent opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100">
+                          <OpenIcon />
+                        </span>
+                      )}
+                    </button>
+                  </div>
+
+                  {open && (
+                    <div className="flex flex-col gap-0.5 pb-3 pl-[42px] pr-3">
+                      {row.steps.map((step) => (
+                        <label
+                          key={step.id}
+                          className="flex cursor-pointer items-center gap-3 py-1.5 text-sm text-accent-soft-fg"
+                        >
+                          <span className="relative flex size-[17px] shrink-0 items-center justify-center">
+                            <input
+                              type="checkbox"
+                              checked={step.done}
+                              onChange={(event) => toggleStep(row, step.id, event.target.checked)}
+                              className="peer size-[17px] cursor-pointer appearance-none rounded-[5px] border-[1.5px] border-border-strong bg-surface transition-colors duration-150 checked:border-accent checked:bg-accent"
+                            />
+                            <span className="pointer-events-none absolute text-accent-fg opacity-0 peer-checked:opacity-100">
+                              <TickIcon />
+                            </span>
+                          </span>
+                          <span
+                            className={`transition-opacity duration-200 ${
+                              step.done ? 'line-through opacity-45' : ''
+                            }`}
+                          >
+                            {step.text}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )
-            }
-
-            return (
-              <div
-                key={row.id}
-                {...dragProps}
-                className={`group mx-2 my-1.5 rounded-[10px] bg-accent-soft transition-opacity duration-150 ${dragging}`}
-              >
-                <div className="flex w-full items-center gap-3 px-3 py-3 text-[15px] text-accent-soft-fg">
-                  {/* A rich row opens in its own window; the queue only shows
-                      that it is one and how far it has come. */}
-                  <button
-                    onClick={() =>
-                      rich ? window.listan.openRow(row.id) : setExpanded(open ? null : row.id)
-                    }
-                    aria-expanded={rich ? undefined : open}
-                    aria-label={rich ? 'Öppna i eget fönster' : open ? 'Fäll ihop' : 'Fäll ut'}
-                    className={`shrink-0 text-accent transition-transform duration-200 ${
-                      rich || open ? '' : '-rotate-90'
-                    }`}
-                  >
-                    {rich ? <WindowIcon /> : <ChevronIcon />}
-                  </button>
-                  <button
-                    onClick={() =>
-                      rich ? window.listan.openRow(row.id) : row.link && window.listan.open(row.id)
-                    }
-                    disabled={!rich && !row.link}
-                    className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:cursor-default"
-                  >
-                    <span className="min-w-0 flex-1 truncate font-medium">{row.text}</span>
-                    {waiting}
-                    {hasSteps && (
-                      <span className="shrink-0 text-[13px] tabular-nums text-accent">
-                        {done}/{row.steps.length}
-                      </span>
-                    )}
-                    {!rich && row.link && (
-                      <span className="shrink-0 text-accent opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100">
-                        <OpenIcon />
-                      </span>
-                    )}
-                  </button>
-                </div>
-
-                {open && (
-                  <div className="flex flex-col gap-0.5 pb-3 pl-[42px] pr-3">
-                    {row.steps.map((step) => (
-                      <label
-                        key={step.id}
-                        className="flex cursor-pointer items-center gap-3 py-1.5 text-sm text-accent-soft-fg"
-                      >
-                        <span className="relative flex size-[17px] shrink-0 items-center justify-center">
-                          <input
-                            type="checkbox"
-                            checked={step.done}
-                            onChange={(event) => toggleStep(row, step.id, event.target.checked)}
-                            className="peer size-[17px] cursor-pointer appearance-none rounded-[5px] border-[1.5px] border-border-strong bg-surface transition-colors duration-150 checked:border-accent checked:bg-accent"
-                          />
-                          <span className="pointer-events-none absolute text-accent-fg opacity-0 peer-checked:opacity-100">
-                            <TickIcon />
-                          </span>
-                        </span>
-                        <span
-                          className={`transition-opacity duration-200 ${
-                            step.done ? 'line-through opacity-45' : ''
-                          }`}
-                        >
-                          {step.text}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )
-          })}
+            })}
         </div>
       </div>
 
@@ -445,8 +490,10 @@ export default function App(): React.JSX.Element {
           </div>
         )}
 
+        {/* Nothing is added to a view of what is already done. */}
         <form
           onSubmit={submitDraft}
+          hidden={showingDone}
           className="flex items-center gap-2.5 border-t border-border px-4 py-2.5"
         >
           <span className="shrink-0 text-fg-subtle">

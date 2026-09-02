@@ -1,4 +1,4 @@
-import { BrowserWindow, clipboard, ipcMain, nativeTheme } from 'electron'
+import { BrowserWindow, clipboard, ipcMain, nativeTheme, shell } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { chrome } from './theme'
@@ -79,6 +79,14 @@ export function registerPanes(): () => void {
 
   ipcMain.handle('clipboard:write', (_event, text: string) => clipboard.writeText(text))
 
+  // The done view opens links from receipts, whose rows are gone. The target
+  // came from an agent, so only http(s) is ever handed to the shell.
+  ipcMain.handle('link:open', (_event, target: string) => {
+    if (!/^https?:\/\//i.test(target)) return false
+    shell.openExternal(target)
+    return true
+  })
+
   ipcMain.handle('settings:get', () => readSettings())
   ipcMain.handle('settings:set', (_event, next: Settings) => {
     nativeTheme.themeSource = next.theme
@@ -92,6 +100,7 @@ export function registerPanes(): () => void {
       'panes:openSettings',
       'panes:close',
       'clipboard:write',
+      'link:open',
       'settings:get',
       'settings:set',
       'settings:paths'
